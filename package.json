@@ -1,8 +1,11 @@
 {
   "name": "smarthome",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
+    "start": "nodemon server.js",
+    "dev": "nodemon server.js",
+    "start-dev": "NODE_ENV=development nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -14,6 +17,22 @@
     "cors": "^2.8.5",
     "dotenv": "^17.0.0",
     "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2"
+    "google-auth-library": "^10.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.14.1",
+    "sequelize": "^6.37.7"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  },
+  "nodemonConfig": {
+    "watch": [
+      "server.js"
+    ],
+    "ext": "js,json,env",
+    "ignore": [
+      "node_modules/",
+      "test/"
+    ]
   }
 }
