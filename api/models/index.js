@@ -34,6 +34,13 @@ db.VariantOptionSelection = require("./VariantOptionSelection.js")(
   Sequelize
 );
 
+db.Service = require("./Service.js")(sequelize, Sequelize); // Thêm model Service
+db.ServicePackage = require("./ServicePackage.js")(sequelize, Sequelize); // Thêm model ServicePackage
+db.PackageServiceItem = require("./PackageServiceItem.js")(
+  sequelize,
+  Sequelize
+);
+
 db.Role.hasMany(db.User, {
   foreignKey: "role_id",
   as: "users",
@@ -132,6 +139,56 @@ db.VariantOptionSelection.belongsTo(db.ProductVariant, {
 db.VariantOptionSelection.belongsTo(db.OptionValue, {
   foreignKey: "option_value_id",
   as: "optionValue",
+});
+
+// --- Mối quan hệ mới cho Services ---
+
+// 7. Mối quan hệ giữa Product và ServicePackage
+// Một Product có nhiều ServicePackages
+db.Product.hasMany(db.ServicePackage, {
+  foreignKey: "product_id",
+  as: "servicePackages",
+});
+// Một ServicePackage thuộc về một Product
+db.ServicePackage.belongsTo(db.Product, {
+  foreignKey: "product_id",
+  as: "product",
+});
+
+// 8. Mối quan hệ giữa ServicePackage và PackageServiceItem
+// Một ServicePackage có nhiều PackageServiceItems
+db.ServicePackage.hasMany(db.PackageServiceItem, {
+  foreignKey: "package_id",
+  as: "packageItems", // Đổi tên 'as' để tránh nhầm lẫn nếu có 'items' khác
+});
+// Một PackageServiceItem thuộc về một ServicePackage
+db.PackageServiceItem.belongsTo(db.ServicePackage, {
+  foreignKey: "package_id",
+  as: "servicePackage",
+});
+
+// 9. Mối quan hệ giữa Service và PackageServiceItem
+// Một Service có nhiều PackageServiceItems (qua đó được sử dụng trong các gói)
+db.Service.hasMany(db.PackageServiceItem, {
+  foreignKey: "service_id",
+  as: "packageServiceItems",
+});
+// Một PackageServiceItem tham chiếu đến một định nghĩa Service
+db.PackageServiceItem.belongsTo(db.Service, {
+  foreignKey: "service_id",
+  as: "serviceDefinition",
+});
+
+// 10. Mối quan hệ giữa Category và Service (nếu thêm category_id vào bảng Service)
+// Một Category có nhiều Services (ví dụ: các dịch vụ liên quan đến Máy lạnh)
+db.Category.hasMany(db.Service, {
+  foreignKey: "category_id",
+  as: "services",
+});
+// Một Service thuộc về một Category (hoặc không nếu category_id là NULL)
+db.Service.belongsTo(db.Category, {
+  foreignKey: "category_id",
+  as: "category",
 });
 
 module.exports = db;
