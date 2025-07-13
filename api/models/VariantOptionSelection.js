@@ -28,22 +28,5 @@ module.exports = (sequelize, Sequelize) => {
     }
   );
 
-  // Quan hệ Many-to-Many
-  // Bạn sẽ cần định nghĩa mối quan hệ này trong file index.js (hoặc file tổng hợp các model)
-  // Ví dụ:
-  // db.productvariants.belongsToMany(db.optionvalues, {
-  //   through: db.variantoptionselections,
-  //   foreignKey: "variant_id",
-  //   otherKey: "option_value_id",
-  //   as: "selectedOptions"
-  // });
-  //
-  // db.optionvalues.belongsToMany(db.products, { // Hoặc db.productvariants tùy thuộc vào ngữ cảnh chính
-  //   through: db.variantoptionselections,
-  //   foreignKey: "option_value_id",
-  //   otherKey: "variant_id",
-  //   as: "variants"
-  // });
-
   return VariantOptionSelection;
 };
