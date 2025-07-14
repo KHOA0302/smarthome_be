@@ -4,40 +4,41 @@ module.exports = (sequelize, Sequelize) => {
     "packageserviceitems", // Tên bảng trong database
     {
       package_service_item_id: {
-        type: Sequelize.INTEGER, // INT từ Type trong ảnh
+        type: Sequelize.INTEGER,
         primaryKey: true,
         autoIncrement: true,
         allowNull: false,
       },
       package_id: {
-        type: Sequelize.INTEGER, // INT từ Type trong ảnh
+        type: Sequelize.INTEGER,
         allowNull: false,
       },
       service_id: {
-        type: Sequelize.INTEGER, // INT từ Type trong ảnh
+        type: Sequelize.INTEGER,
         allowNull: false,
       },
+      // ĐÃ ĐƯA LẠI: item_price_impact
       item_price_impact: {
-        type: Sequelize.DECIMAL(10, 2), // DECIMAL từ Type trong ảnh
+        type: Sequelize.DECIMAL(10, 2), // DECIMAL từ Type trong ảnh, để lưu giá trị tiền tệ
         allowNull: false,
       },
-      is_fixed_selection: {
-        type: Sequelize.BOOLEAN, // TINYINT từ Type trong ảnh, ánh xạ thành BOOLEAN
+      atLeastOne: {
+        type: Sequelize.BOOLEAN, // TINYINT trong SQL, ánh xạ thành BOOLEAN
         allowNull: false,
         defaultValue: false, // Mặc định là không cố định (có thể bỏ chọn)
       },
-      is_default_selected: {
-        type: Sequelize.BOOLEAN, // TINYINT từ Type trong ảnh, ánh xạ thành BOOLEAN
+      selectable: {
+        type: Sequelize.BOOLEAN, // TINYINT trong SQL, ánh xạ thành BOOLEAN
         allowNull: false,
         defaultValue: true, // Mặc định là được chọn ban đầu
       },
       created_at: {
-        type: Sequelize.DATE, // TIMESTAMP từ Type trong ảnh
+        type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.NOW,
       },
       updated_at: {
-        type: Sequelize.DATE, // TIMESTAMP từ Type trong ảnh
+        type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.NOW,
         onUpdate: Sequelize.NOW, // Tự động cập nhật khi có thay đổi
@@ -49,7 +50,7 @@ module.exports = (sequelize, Sequelize) => {
       indexes: [
         {
           unique: true,
-          fields: ["package_id", "service_id"], // Ràng buộc duy nhất: mỗi dịch vụ chỉ xuất hiện một lần trong một gói
+          fields: ["package_id", "service_id"], // Mỗi dịch vụ chỉ xuất hiện một lần trong một gói
         },
       ],
     }

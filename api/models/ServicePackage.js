@@ -7,47 +7,48 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.INTEGER,
         primaryKey: true,
         autoIncrement: true,
-        allowNull: false, // Dựa trên convention service_id là PK và tự tăng nên không thể null
+        allowNull: false,
       },
-      product_id: {
-        type: Sequelize.INTEGER, // INT từ Type trong ảnh
+      // THAY ĐỔI LỚN: Bây giờ liên kết với variant_id
+      variant_id: {
+        type: Sequelize.INTEGER,
         allowNull: false,
       },
       package_name: {
-        type: Sequelize.STRING(255), // VARCHAR từ Type trong ảnh
+        type: Sequelize.STRING(255),
         allowNull: false,
       },
       is_default: {
-        type: Sequelize.BOOLEAN, // TINYINT từ Type trong ảnh, Sequelize ánh xạ thành BOOLEAN
-        allowNull: true, // Có thể null hoặc có giá trị mặc định tùy vào logic
+        type: Sequelize.BOOLEAN, // Cột này từ hình ảnh, có thể sử dụng để đánh dấu gói mặc định
+        allowNull: true,
       },
       display_order: {
-        type: Sequelize.INTEGER, // INT từ Type trong ảnh
-        allowNull: true, // Có thể null
+        type: Sequelize.INTEGER, // Cột này từ hình ảnh, hữu ích cho thứ tự hiển thị
+        allowNull: true,
       },
       description: {
-        type: Sequelize.TEXT, // TEXT từ Type trong ảnh
-        allowNull: true, // Có thể null
+        type: Sequelize.TEXT,
+        allowNull: true,
       },
       created_at: {
-        type: Sequelize.DATE, // TIMESTAMP từ Type trong ảnh
+        type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.NOW,
       },
       updated_at: {
-        type: Sequelize.DATE, // TIMESTAMP từ Type trong ảnh
+        type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.NOW,
-        onUpdate: Sequelize.NOW, // Tự động cập nhật khi có thay đổi
+        onUpdate: Sequelize.NOW,
       },
     },
     {
-      timestamps: false, // Tắt timestamps tự động của Sequelize vì chúng ta tự định nghĩa created_at/updated_at
+      timestamps: false, // Tắt timestamps tự động của Sequelize (vì đã quản lý thủ công)
       tableName: "servicepackages", // Đảm bảo tên bảng khớp với SQL
       indexes: [
         {
           unique: true,
-          fields: ["product_id", "package_name"], // Ràng buộc duy nhất như đã thảo luận
+          fields: ["variant_id", "package_name"], // Đảm bảo tên gói duy nhất cho mỗi biến thể
         },
       ],
     }

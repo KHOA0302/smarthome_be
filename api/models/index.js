@@ -141,54 +141,61 @@ db.VariantOptionSelection.belongsTo(db.OptionValue, {
   as: "optionValue",
 });
 
-// --- Mối quan hệ mới cho Services ---
+// --- Mối quan hệ MỚI và ĐÃ ĐIỀU CHỈNH cho Services ---
 
-// 7. Mối quan hệ giữa Product và ServicePackage
-// Một Product có nhiều ServicePackages
-db.Product.hasMany(db.ServicePackage, {
-  foreignKey: "product_id",
-  as: "servicePackages",
+// 7. Mối quan hệ giữa ProductVariant và ServicePackage
+// MỘT ProductVariant có NHIỀU ServicePackage
+db.ProductVariant.hasMany(db.ServicePackage, {
+  foreignKey: "variant_id", // Khóa ngoại trong ServicePackage trỏ về ProductVariant
+  as: "servicePackages", // Alias khi include các gói dịch vụ của một biến thể
 });
-// Một ServicePackage thuộc về một Product
-db.ServicePackage.belongsTo(db.Product, {
-  foreignKey: "product_id",
-  as: "product",
+// MỘT ServicePackage thuộc về MỘT ProductVariant
+db.ServicePackage.belongsTo(db.ProductVariant, {
+  foreignKey: "variant_id",
+  as: "productVariant", // Alias khi include ProductVariant từ ServicePackage
 });
 
 // 8. Mối quan hệ giữa ServicePackage và PackageServiceItem
-// Một ServicePackage có nhiều PackageServiceItems
+// MỘT ServicePackage có NHIỀU PackageServiceItem
 db.ServicePackage.hasMany(db.PackageServiceItem, {
-  foreignKey: "package_id",
-  as: "packageItems", // Đổi tên 'as' để tránh nhầm lẫn nếu có 'items' khác
+  foreignKey: "package_id", // Khóa ngoại trong PackageServiceItem trỏ về ServicePackage
+  as: "packageItems", // Alias khi include các mục dịch vụ của một gói
 });
-// Một PackageServiceItem thuộc về một ServicePackage
+// MỘT PackageServiceItem thuộc về MỘT ServicePackage
 db.PackageServiceItem.belongsTo(db.ServicePackage, {
   foreignKey: "package_id",
-  as: "servicePackage",
+  as: "servicePackage", // Alias khi include ServicePackage từ PackageServiceItem
 });
 
 // 9. Mối quan hệ giữa Service và PackageServiceItem
-// Một Service có nhiều PackageServiceItems (qua đó được sử dụng trong các gói)
+// MỘT Service (định nghĩa) có NHIỀU PackageServiceItem (được sử dụng trong các gói)
 db.Service.hasMany(db.PackageServiceItem, {
-  foreignKey: "service_id",
-  as: "packageServiceItems",
+  foreignKey: "service_id", // Khóa ngoại trong PackageServiceItem trỏ về Service
+  as: "packageServiceItems", // Alias khi include các mục gói liên quan đến dịch vụ này
 });
-// Một PackageServiceItem tham chiếu đến một định nghĩa Service
+// MỘT PackageServiceItem thuộc về MỘT Service
 db.PackageServiceItem.belongsTo(db.Service, {
   foreignKey: "service_id",
-  as: "serviceDefinition",
+  as: "serviceDefinition", // Alias khi include Service từ PackageServiceItem
 });
 
-// 10. Mối quan hệ giữa Category và Service (nếu thêm category_id vào bảng Service)
-// Một Category có nhiều Services (ví dụ: các dịch vụ liên quan đến Máy lạnh)
+// 10. Mối quan hệ giữa Category và Service
 db.Category.hasMany(db.Service, {
   foreignKey: "category_id",
   as: "services",
 });
-// Một Service thuộc về một Category (hoặc không nếu category_id là NULL)
+
 db.Service.belongsTo(db.Category, {
   foreignKey: "category_id",
-  as: "category",
+  as: "serviceCategory",
+});
+
+// Sau khi định nghĩa tất cả các models và associations, gọi associate()
+// để Sequelize thiết lập các mối quan hệ hai chiều.
+Object.keys(db).forEach((modelName) => {
+  if (db[modelName].associate) {
+    db[modelName].associate(db);
+  }
 });
 
 module.exports = db;
