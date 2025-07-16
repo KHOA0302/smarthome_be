@@ -34,19 +34,19 @@ const handleLoginAttemp = async (req, res) => {
     }
 
     const payload = {
-      user_id: user.id,
+      user_id: user.user_id,
       username: user.email,
       role_id: user.role_id,
       role_name: user.role ? user.role.role_name : null,
     };
 
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
 
     res.status(200).json({
       message: "Đăng nhập thành công!",
       token: token,
       user: {
-        id: user.id,
+        id: user.user_id,
         full_name: user.full_name,
         email: user.email,
         role_id: user.role_id,

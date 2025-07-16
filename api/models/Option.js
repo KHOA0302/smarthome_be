@@ -27,14 +27,5 @@ module.exports = (sequelize, Sequelize) => {
     }
   );
 
-  // Quan hệ: Một Option thuộc về một Category
-  // Bạn sẽ cần định nghĩa mối quan hệ này trong file index.js (hoặc file tổng hợp các model)
-  // Ví dụ:
-  // db.options.belongsTo(db.categories, {
-  //   foreignKey: "category_id",
-  //   targetKey: "category_id", // Optional, if foreign key name is different from target table's primary key
-  //   as: "category"
-  // });
-
   return Option;
 };

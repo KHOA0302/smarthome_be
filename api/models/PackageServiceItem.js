@@ -22,7 +22,7 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.DECIMAL(10, 2), // DECIMAL từ Type trong ảnh, để lưu giá trị tiền tệ
         allowNull: false,
       },
-      atLeastOne: {
+      at_least_one: {
         type: Sequelize.BOOLEAN, // TINYINT trong SQL, ánh xạ thành BOOLEAN
         allowNull: false,
         defaultValue: false, // Mặc định là không cố định (có thể bỏ chọn)

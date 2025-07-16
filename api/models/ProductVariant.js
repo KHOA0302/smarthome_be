@@ -32,7 +32,7 @@ module.exports = (sequelize, Sequelize) => {
       item_status: {
         type: Sequelize.STRING, // Tương ứng với VARCHAR, có thể là 'in_stock', 'out_of_stock', 'limited_stock'
         allowNull: false, // Giả sử item_status không được phép null
-        defaultValue: 'in_stock', // Giá trị mặc định phổ biến
+        defaultValue: "in_stock", // Giá trị mặc định phổ biến
       },
       created_at: {
         type: Sequelize.DATE, // Tương ứng với TIMESTAMP
@@ -47,7 +47,7 @@ module.exports = (sequelize, Sequelize) => {
     },
     {
       timestamps: false, // Chúng ta sẽ tự định nghĩa created_at và updated_at
-      tableName: 'productvariants', // Đảm bảo tên bảng là 'productvariants'
+      tableName: "productvariants", // Đảm bảo tên bảng là 'productvariants'
       // Để updated_at tự động cập nhật, bạn có thể sử dụng hooks hoặc cấu hình `timestamps: true`
     }
   );

@@ -41,6 +41,10 @@ db.PackageServiceItem = require("./PackageServiceItem.js")(
   Sequelize
 );
 
+// START: THÊM DÒNG NÀY ĐỂ IMPORT MODEL ProductImage
+db.ProductImage = require("./ProductImage.js")(sequelize, Sequelize);
+// END: THÊM DÒNG NÀY ĐỂ IMPORT MODEL ProductImage
+
 db.Role.hasMany(db.User, {
   foreignKey: "role_id",
   as: "users",
@@ -88,6 +92,22 @@ db.ProductVariant.belongsTo(db.Product, {
   foreignKey: "product_id",
   as: "product",
 });
+
+// START: THÊM MỐI QUAN HỆ CHO ProductImage
+// 3a. Mối quan hệ giữa Product và ProductImage
+// Một Product có nhiều ProductImages
+db.Product.hasMany(db.ProductImage, {
+  foreignKey: "product_id",
+  as: "product_images", // Alias để truy vấn ảnh của sản phẩm
+  onDelete: "CASCADE", // Khi sản phẩm bị xóa, các ảnh liên quan cũng bị xóa
+  onUpdate: "CASCADE", // Khi product_id của Product thay đổi, ảnh cũng cập nhật
+});
+// Một ProductImage thuộc về một Product
+db.ProductImage.belongsTo(db.Product, {
+  foreignKey: "product_id",
+  as: "product", // Alias để truy vấn sản phẩm từ ảnh
+});
+// END: THÊM MỐI QUAN HỆ CHO ProductImage
 
 // 4. Mối quan hệ giữa Category và Option
 // Một Category có nhiều Options (ví dụ: một danh mục điện thoại có tùy chọn "Màu sắc", "Bộ nhớ")

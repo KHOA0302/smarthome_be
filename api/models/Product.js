@@ -19,10 +19,7 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.INTEGER, // Tương ứng với INT
         allowNull: false, // Giả sử category_id không được phép null (khóa ngoại)
       },
-      image_url: {
-        type: Sequelize.STRING, // Tương ứng với VARCHAR
-        allowNull: true, // Giả sử image_url có thể null
-      },
+
       is_active: {
         type: Sequelize.BOOLEAN, // Tương ứng với TINYINT(1) cho boolean
         allowNull: false, // Giả sử is_active không được phép null

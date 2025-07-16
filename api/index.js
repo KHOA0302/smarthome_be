@@ -9,6 +9,7 @@ const brandRouter = require("./routes/brand");
 const categoryRouter = require("./routes/category");
 const optionRouter = require("./routes/option");
 const serviceRouter = require("./routes/service");
+const productRouter = require("./routes/product");
 
 const cors = require("cors");
 
@@ -23,5 +24,6 @@ app.use("/brand", brandRouter);
 app.use("/category", categoryRouter);
 app.use("/option", optionRouter);
 app.use("/service-package", serviceRouter);
+app.use("/product", productRouter);
 
 module.exports = app;
