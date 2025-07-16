@@ -61,18 +61,16 @@ const createProductWithDetails = async (req, res) => {
     const newProduct = await Product.create(
       {
         product_name: basic.name.trim(),
-        // description: basic.des || null, // Chỉ thêm nếu có trong model Product
+        description: basic.des || null,
         brand_id: basic.brand,
         category_id: basic.category,
-        // DÒNG NÀY ĐÃ BỊ XÓA HOẶC KHÔNG CÒN CẦN THIẾT NỮA TRONG MODEL PRODUCT:
-        // image_url: basic.imgs && basic.imgs.length > 0 ? basic.imgs[0] : null,
       },
       { transaction }
     );
 
     const productId = newProduct.product_id;
 
-    // --- BƯỚC MỚI: LƯU TRỮ HÌNH ẢNH VÀO BẢNG ProductImages ---
+    // --- BƯỚC 3: LƯU TRỮ HÌNH ẢNH VÀO BẢNG ProductImages ---
     if (basic.imgs && Array.isArray(basic.imgs) && basic.imgs.length > 0) {
       const productImagesToCreate = basic.imgs.map((imageUrl, index) => ({
         product_id: productId,
@@ -83,12 +81,11 @@ const createProductWithDetails = async (req, res) => {
       await ProductImage.bulkCreate(productImagesToCreate, { transaction });
     }
 
-    // --- BƯỚC 3: XỬ LÝ OPTIONS VÀ OPTIONVALUES ---
+    // --- BƯỚC 4: XỬ LÝ OPTIONS VÀ OPTIONVALUES ---
     const optionValueMap = new Map(); // Map: "value_name" -> option_value_id
 
     if (options && Array.isArray(options)) {
       for (const optData of options) {
-        // Kiểm tra sự tồn tại của Option (optionId)
         const existingOption = await Option.findByPk(optData.optionId, {
           transaction,
         });
@@ -98,7 +95,7 @@ const createProductWithDetails = async (req, res) => {
 
         if (optData.optionValue && Array.isArray(optData.optionValue)) {
           for (const valueName of optData.optionValue) {
-            if (valueName.trim() === "") continue; // Bỏ qua giá trị rỗng
+            if (valueName.trim() === "") continue;
 
             const [optionValue, createdOptionValue] =
               await OptionValue.findOrCreate({
@@ -118,12 +115,11 @@ const createProductWithDetails = async (req, res) => {
       }
     }
 
-    // --- BƯỚC 4: XỬ LÝ PRODUCTVARIANTS VÀ VARIANTOPTIONSELECTIONS ---
+    // --- BƯỚC 5: XỬ LÝ PRODUCTVARIANTS VÀ VARIANTOPTIONSELECTIONS ---
     const variantIdMap = new Map(); // Map: SKU -> variant_id
 
     if (variants && Array.isArray(variants)) {
       for (const variantData of variants) {
-        // Bỏ qua các biến thể bị đánh dấu xóa (nếu có logic này từ frontend)
         if (variantData.isRemove) continue;
 
         if (!variantData.sku || variantData.sku.trim() === "") {
@@ -145,9 +141,10 @@ const createProductWithDetails = async (req, res) => {
           {
             product_id: productId,
             variant_sku: variantData.sku.trim(),
+            variant_name: variantData.variantName,
             price: parseFloat(String(variantData.price).replace(/\./g, "")),
             stock_quantity: parseInt(variantData.quantity),
-            image_url: variantData.img || null, // Vẫn giữ image_url cho từng variant nếu cần
+            image_url: variantData.img || null,
             item_status: variantData.itemStatus || "in_stock",
           },
           { transaction }
@@ -175,7 +172,7 @@ const createProductWithDetails = async (req, res) => {
       }
     }
 
-    // --- BƯỚC 5: XỬ LÝ SERVICEPACKAGES VÀ PACKAGESERVICEITEMS ---
+    // --- BƯỚC 6: XỬ LÝ SERVICEPACKAGES VÀ PACKAGESERVICEITEMS ---
     if (services && Array.isArray(services)) {
       for (const serviceSkuData of services) {
         if (serviceSkuData.isRemove) continue;

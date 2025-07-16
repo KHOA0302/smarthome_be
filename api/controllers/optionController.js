@@ -2,7 +2,7 @@ const db = require("../models");
 const Option = db.Option;
 const Sequelize = db.Sequelize; // Cần thiết cho các toán tử như Op.like
 
-// Hàm để lấy tất cả các tùy chọn (có thể có bộ lọc tùy chọn)
+
 const getAllOptions = async (req, res) => {
   // Lấy categoryId từ query parameter nếu có (ví dụ: /api/options?categoryId=1)
   const { categoryId } = req.query;
@@ -48,7 +48,7 @@ const getAllOptions = async (req, res) => {
   }
 };
 
-// Hàm để lấy một tùy chọn theo ID
+
 const getOptionById = async (req, res) => {
   const { id } = req.params; // Lấy option_id từ URL params
 
@@ -88,7 +88,7 @@ const getOptionById = async (req, res) => {
   }
 };
 
-// Hàm để tạo một tùy chọn mới
+
 const createOption = async (req, res) => {
   const { option_name, is_filterable, category_id } = req.body;
 
@@ -133,7 +133,7 @@ const createOption = async (req, res) => {
   }
 };
 
-// Hàm để cập nhật thông tin tùy chọn
+
 const updateOption = async (req, res) => {
   const { id } = req.params;
   const { option_name, is_filterable, category_id } = req.body;
@@ -197,7 +197,7 @@ const updateOption = async (req, res) => {
   }
 };
 
-// Hàm để xóa một tùy chọn
+
 const deleteOption = async (req, res) => {
   const { id } = req.params;
 
@@ -229,9 +229,9 @@ const deleteOption = async (req, res) => {
   }
 };
 
-// Hàm controller để lọc các tùy chọn (sử dụng POST)
+
 const filterOptions = async (req, res) => {
-  const { category_id, is_filterable } = req.body; // Lấy các tiêu chí lọc từ request body
+  const { category_id, is_filterable } = req.body; 
 
   let whereClause = {};
 
@@ -287,5 +287,5 @@ module.exports = {
   createOption,
   updateOption,
   deleteOption,
-  filterOptions, // Export hàm lọc
+  filterOptions, 
 };

@@ -65,7 +65,7 @@ const handleLoginAttemp = async (req, res) => {
 const handleRegister = async (req, res) => {
   const { email, password, full_name } = req.body;
   try {
-    // 1. Xác thực đầu vào cơ bản
+
     if (!email || !password || !full_name) {
       return res
         .status(400)
@@ -129,7 +129,7 @@ const handleGoogle = async (req, res) => {
 
     const payload = ticket.getPayload();
     console.log("Google Payload:", payload);
-    const googleUserId = payload["sub"]; // ID duy nhất của người dùng Google
+    const googleUserId = payload["sub"]; 
     const email = payload["email"];
     const fullName = payload["name"];
     const avatar = payload["picture"];
@@ -151,8 +151,7 @@ const handleGoogle = async (req, res) => {
         console.log(
           `Email ${email} đã có tài khoản truyền thống. Liên kết với Google.`
         );
-        // Hỏi người dùng có muốn liên kết không (thường làm ở frontend),
-        // nếu người dùng đồng ý, thì bạn cập nhật user_id đó:
+     
         existingTraditionalUser.google_sub_id = googleUserId;
         existingTraditionalUser.is_email_verified = isEmailVerifiedByGoogle;
         existingTraditionalUser.full_name =
@@ -172,7 +171,7 @@ const handleGoogle = async (req, res) => {
             is_profile_complete: user.is_profile_complete,
           },
         });
-        return; // Kết thúc hàm ở đây nếu đã liên kết và gửi phản hồi
+        return; 
       } else {
         console.log(`Tạo tài khoản mới cho ${email} qua Google.`);
         user = await User.create({
@@ -237,7 +236,7 @@ const generateAuthToken = (user) => {
     email: user.email,
     role_id: user.role_id,
   };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" }); // Token hết hạn sau 1 giờ
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" }); 
 };
 
 module.exports = { handleLoginAttemp, handleRegister, handleGoogle };

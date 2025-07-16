@@ -28,12 +28,12 @@ const getAllCategories = async (req, res) => {
   }
 };
 
-// Hàm để lấy một danh mục theo ID
+
 const getCategoryById = async (req, res) => {
-  const { id } = req.params; // Lấy category_id từ URL params
+  const { id } = req.params; 
 
   try {
-    const category = await Category.findByPk(id); // Sử dụng findByPk để tìm theo khóa chính
+    const category = await Category.findByPk(id); 
 
     if (!category) {
       return res
@@ -54,12 +54,12 @@ const getCategoryById = async (req, res) => {
   }
 };
 
-// Hàm để tạo một danh mục mới (ví dụ, chỉ dành cho Admin)
+
 const createCategory = async (req, res) => {
   const { category_name, display_order } = req.body;
 
   try {
-    // Kiểm tra xem category_name đã tồn tại chưa
+  
     const existingCategory = await Category.findOne({
       where: { category_name: category_name },
     });
@@ -85,7 +85,7 @@ const createCategory = async (req, res) => {
   }
 };
 
-// Hàm để cập nhật thông tin danh mục (ví dụ, chỉ dành cho Admin)
+
 const updateCategory = async (req, res) => {
   const { id } = req.params;
   const { category_name, display_order } = req.body;
@@ -99,7 +99,6 @@ const updateCategory = async (req, res) => {
         .json({ message: `Không tìm thấy danh mục với ID: ${id}.` });
     }
 
-    // Kiểm tra xem tên danh mục mới có trùng với tên danh mục khác không (nếu tên thay đổi)
     if (category_name && category_name !== category.category_name) {
       const existingCategory = await Category.findOne({
         where: { category_name: category_name },
@@ -116,7 +115,7 @@ const updateCategory = async (req, res) => {
     category.display_order =
       display_order !== undefined ? display_order : category.display_order;
 
-    await category.save(); // Lưu các thay đổi vào database
+    await category.save(); 
 
     res.status(200).json({
       message: `Cập nhật danh mục với ID ${id} thành công.`,
@@ -131,7 +130,7 @@ const updateCategory = async (req, res) => {
   }
 };
 
-// Hàm để xóa một danh mục (ví dụ, chỉ dành cho Admin)
+
 const deleteCategory = async (req, res) => {
   const { id } = req.params;
 
@@ -148,7 +147,7 @@ const deleteCategory = async (req, res) => {
     // Ví dụ: set category_id của các sản phẩm về null hoặc xóa sản phẩm liên quan.
     // Tùy thuộc vào business logic của bạn.
 
-    await category.destroy(); // Xóa bản ghi khỏi database
+    await category.destroy(); 
 
     res.status(200).json({
       message: `Xóa danh mục với ID ${id} thành công.`,

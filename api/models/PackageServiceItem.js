@@ -1,7 +1,6 @@
-// models/packageServiceItem.model.js
 module.exports = (sequelize, Sequelize) => {
   const PackageServiceItem = sequelize.define(
-    "packageserviceitems", // Tên bảng trong database
+    "packageserviceitems",
     {
       package_service_item_id: {
         type: Sequelize.INTEGER,
@@ -17,20 +16,20 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.INTEGER,
         allowNull: false,
       },
-      // ĐÃ ĐƯA LẠI: item_price_impact
+
       item_price_impact: {
-        type: Sequelize.DECIMAL(10, 2), // DECIMAL từ Type trong ảnh, để lưu giá trị tiền tệ
+        type: Sequelize.DECIMAL(10, 2),
         allowNull: false,
       },
       at_least_one: {
-        type: Sequelize.BOOLEAN, // TINYINT trong SQL, ánh xạ thành BOOLEAN
+        type: Sequelize.BOOLEAN,
         allowNull: false,
-        defaultValue: false, // Mặc định là không cố định (có thể bỏ chọn)
+        defaultValue: false,
       },
       selectable: {
-        type: Sequelize.BOOLEAN, // TINYINT trong SQL, ánh xạ thành BOOLEAN
+        type: Sequelize.BOOLEAN,
         allowNull: false,
-        defaultValue: true, // Mặc định là được chọn ban đầu
+        defaultValue: true,
       },
       created_at: {
         type: Sequelize.DATE,
@@ -41,16 +40,16 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.NOW,
-        onUpdate: Sequelize.NOW, // Tự động cập nhật khi có thay đổi
+        onUpdate: Sequelize.NOW,
       },
     },
     {
-      timestamps: false, // Tắt timestamps tự động của Sequelize
-      tableName: "packageserviceitems", // Đảm bảo tên bảng khớp với SQL
+      timestamps: false,
+      tableName: "packageserviceitems",
       indexes: [
         {
           unique: true,
-          fields: ["package_id", "service_id"], // Mỗi dịch vụ chỉ xuất hiện một lần trong một gói
+          fields: ["package_id", "service_id"],
         },
       ],
     }

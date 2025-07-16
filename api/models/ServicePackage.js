@@ -1,7 +1,7 @@
 // models/servicePackage.model.js
 module.exports = (sequelize, Sequelize) => {
   const ServicePackage = sequelize.define(
-    "servicepackages", // Tên bảng trong database
+    "servicepackages",
     {
       package_id: {
         type: Sequelize.INTEGER,
@@ -9,7 +9,7 @@ module.exports = (sequelize, Sequelize) => {
         autoIncrement: true,
         allowNull: false,
       },
-      // THAY ĐỔI LỚN: Bây giờ liên kết với variant_id
+
       variant_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
@@ -19,11 +19,11 @@ module.exports = (sequelize, Sequelize) => {
         allowNull: false,
       },
       is_default: {
-        type: Sequelize.BOOLEAN, // Cột này từ hình ảnh, có thể sử dụng để đánh dấu gói mặc định
+        type: Sequelize.BOOLEAN,
         allowNull: true,
       },
       display_order: {
-        type: Sequelize.INTEGER, // Cột này từ hình ảnh, hữu ích cho thứ tự hiển thị
+        type: Sequelize.INTEGER,
         allowNull: true,
       },
       description: {
@@ -43,12 +43,12 @@ module.exports = (sequelize, Sequelize) => {
       },
     },
     {
-      timestamps: false, // Tắt timestamps tự động của Sequelize (vì đã quản lý thủ công)
-      tableName: "servicepackages", // Đảm bảo tên bảng khớp với SQL
+      timestamps: false,
+      tableName: "servicepackages",
       indexes: [
         {
           unique: true,
-          fields: ["variant_id", "package_name"], // Đảm bảo tên gói duy nhất cho mỗi biến thể
+          fields: ["variant_id", "package_name"],
         },
       ],
     }

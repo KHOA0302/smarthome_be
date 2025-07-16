@@ -46,22 +46,22 @@ module.exports = (sequelize, Sequelize) => {
         },
       },
       login_method: {
-        type: Sequelize.STRING(50), // Đảm bảo độ dài khớp với DB
+        type: Sequelize.STRING(50), 
         allowNull: false,
         defaultValue: "traditional",
       },
       google_sub_id: {
-        type: Sequelize.STRING(255), // Đảm bảo độ dài khớp với DB
+        type: Sequelize.STRING(255),
         unique: true,
-        allowNull: true, // Cho phép NULL
+        allowNull: true,
       },
       is_email_verified: {
-        type: Sequelize.BOOLEAN, // Sequelize sẽ map thành TINYINT(1) trong MySQL
+        type: Sequelize.BOOLEAN, 
         allowNull: false,
         defaultValue: false,
       },
       is_profile_complete: {
-        type: Sequelize.BOOLEAN, // Sequelize sẽ map thành TINYINT(1) trong MySQL
+        type: Sequelize.BOOLEAN, 
         allowNull: false,
         defaultValue: false,
       },

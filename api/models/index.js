@@ -34,16 +34,14 @@ db.VariantOptionSelection = require("./VariantOptionSelection.js")(
   Sequelize
 );
 
-db.Service = require("./Service.js")(sequelize, Sequelize); // Thêm model Service
-db.ServicePackage = require("./ServicePackage.js")(sequelize, Sequelize); // Thêm model ServicePackage
+db.Service = require("./Service.js")(sequelize, Sequelize);
+db.ServicePackage = require("./ServicePackage.js")(sequelize, Sequelize);
 db.PackageServiceItem = require("./PackageServiceItem.js")(
   sequelize,
   Sequelize
 );
 
-// START: THÊM DÒNG NÀY ĐỂ IMPORT MODEL ProductImage
 db.ProductImage = require("./ProductImage.js")(sequelize, Sequelize);
-// END: THÊM DÒNG NÀY ĐỂ IMPORT MODEL ProductImage
 
 db.Role.hasMany(db.User, {
   foreignKey: "role_id",
@@ -55,103 +53,82 @@ db.User.belongsTo(db.Role, {
   as: "role",
 });
 
-// --- Mối quan hệ mới được thêm vào ---
-
-// 1. Mối quan hệ giữa Brand và Product
-// Một Brand có nhiều Products
 db.Brand.hasMany(db.Product, {
   foreignKey: "brand_id",
   as: "products",
 });
-// Một Product thuộc về một Brand
+
 db.Product.belongsTo(db.Brand, {
   foreignKey: "brand_id",
   as: "brand",
 });
 
-// 2. Mối quan hệ giữa Category và Product
-// Một Category có nhiều Products
 db.Category.hasMany(db.Product, {
   foreignKey: "category_id",
   as: "products",
 });
-// Một Product thuộc về một Category
+
 db.Product.belongsTo(db.Category, {
   foreignKey: "category_id",
   as: "category",
 });
 
-// 3. Mối quan hệ giữa Product và ProductVariant
-// Một Product có nhiều ProductVariants
 db.Product.hasMany(db.ProductVariant, {
   foreignKey: "product_id",
   as: "variants",
 });
-// Một ProductVariant thuộc về một Product
+
 db.ProductVariant.belongsTo(db.Product, {
   foreignKey: "product_id",
   as: "product",
 });
 
-// START: THÊM MỐI QUAN HỆ CHO ProductImage
-// 3a. Mối quan hệ giữa Product và ProductImage
-// Một Product có nhiều ProductImages
 db.Product.hasMany(db.ProductImage, {
   foreignKey: "product_id",
-  as: "product_images", // Alias để truy vấn ảnh của sản phẩm
-  onDelete: "CASCADE", // Khi sản phẩm bị xóa, các ảnh liên quan cũng bị xóa
-  onUpdate: "CASCADE", // Khi product_id của Product thay đổi, ảnh cũng cập nhật
+  as: "product_images",
+  onDelete: "CASCADE",
+  onUpdate: "CASCADE",
 });
-// Một ProductImage thuộc về một Product
+
 db.ProductImage.belongsTo(db.Product, {
   foreignKey: "product_id",
-  as: "product", // Alias để truy vấn sản phẩm từ ảnh
+  as: "product",
 });
-// END: THÊM MỐI QUAN HỆ CHO ProductImage
 
-// 4. Mối quan hệ giữa Category và Option
-// Một Category có nhiều Options (ví dụ: một danh mục điện thoại có tùy chọn "Màu sắc", "Bộ nhớ")
 db.Category.hasMany(db.Option, {
   foreignKey: "category_id",
   as: "options",
 });
-// Một Option thuộc về một Category
+
 db.Option.belongsTo(db.Category, {
   foreignKey: "category_id",
   as: "category",
 });
 
-// 5. Mối quan hệ giữa Option và OptionValue
-// Một Option có nhiều OptionValues (ví dụ: Option "Màu sắc" có các OptionValue "Đỏ", "Xanh")
 db.Option.hasMany(db.OptionValue, {
   foreignKey: "option_id",
   as: "optionValues",
 });
-// Một OptionValue thuộc về một Option
+
 db.OptionValue.belongsTo(db.Option, {
   foreignKey: "option_id",
   as: "option",
 });
 
-// 6. Mối quan hệ Many-to-Many giữa ProductVariant và OptionValue thông qua VariantOptionSelection
-// Một ProductVariant có nhiều OptionValues được chọn
 db.ProductVariant.belongsToMany(db.OptionValue, {
-  through: db.VariantOptionSelection, // Tên model của bảng trung gian
-  foreignKey: "variant_id", // Khóa ngoại trong bảng trung gian trỏ đến ProductVariant
-  otherKey: "option_value_id", // Khóa ngoại trong bảng trung gian trỏ đến OptionValue
-  as: "selectedOptionValues", // Alias khi bạn include các option values
+  through: db.VariantOptionSelection,
+  foreignKey: "variant_id",
+  otherKey: "option_value_id",
+  as: "selectedOptionValues",
 });
 
-// Một OptionValue có thể thuộc về nhiều ProductVariants (đã chọn)
 db.OptionValue.belongsToMany(db.ProductVariant, {
-  through: db.VariantOptionSelection, // Tên model của bảng trung gian
-  foreignKey: "option_value_id", // Khóa ngoại trong bảng trung gian trỏ đến OptionValue
-  otherKey: "variant_id", // Khóa ngoại trong bảng trung gian trỏ đến ProductVariant
-  as: "productVariants", // Alias khi bạn include các product variants
+  through: db.VariantOptionSelection,
+  foreignKey: "option_value_id",
+  otherKey: "variant_id",
+  as: "productVariants",
 });
 
-// Nếu bạn muốn truy cập trực tiếp từ VariantOptionSelection đến ProductVariant và OptionValue
-// (Điều này thường không cần thiết khi sử dụng belongsToMany, nhưng có thể hữu ích trong một số trường hợp)
 db.VariantOptionSelection.belongsTo(db.ProductVariant, {
   foreignKey: "variant_id",
   as: "productVariant",
@@ -161,45 +138,36 @@ db.VariantOptionSelection.belongsTo(db.OptionValue, {
   as: "optionValue",
 });
 
-// --- Mối quan hệ MỚI và ĐÃ ĐIỀU CHỈNH cho Services ---
-
-// 7. Mối quan hệ giữa ProductVariant và ServicePackage
-// MỘT ProductVariant có NHIỀU ServicePackage
 db.ProductVariant.hasMany(db.ServicePackage, {
-  foreignKey: "variant_id", // Khóa ngoại trong ServicePackage trỏ về ProductVariant
-  as: "servicePackages", // Alias khi include các gói dịch vụ của một biến thể
+  foreignKey: "variant_id",
+  as: "servicePackages",
 });
-// MỘT ServicePackage thuộc về MỘT ProductVariant
+
 db.ServicePackage.belongsTo(db.ProductVariant, {
   foreignKey: "variant_id",
-  as: "productVariant", // Alias khi include ProductVariant từ ServicePackage
+  as: "productVariant",
 });
 
-// 8. Mối quan hệ giữa ServicePackage và PackageServiceItem
-// MỘT ServicePackage có NHIỀU PackageServiceItem
 db.ServicePackage.hasMany(db.PackageServiceItem, {
-  foreignKey: "package_id", // Khóa ngoại trong PackageServiceItem trỏ về ServicePackage
-  as: "packageItems", // Alias khi include các mục dịch vụ của một gói
+  foreignKey: "package_id",
+  as: "packageItems",
 });
-// MỘT PackageServiceItem thuộc về MỘT ServicePackage
+
 db.PackageServiceItem.belongsTo(db.ServicePackage, {
   foreignKey: "package_id",
-  as: "servicePackage", // Alias khi include ServicePackage từ PackageServiceItem
+  as: "servicePackage",
 });
 
-// 9. Mối quan hệ giữa Service và PackageServiceItem
-// MỘT Service (định nghĩa) có NHIỀU PackageServiceItem (được sử dụng trong các gói)
 db.Service.hasMany(db.PackageServiceItem, {
-  foreignKey: "service_id", // Khóa ngoại trong PackageServiceItem trỏ về Service
-  as: "packageServiceItems", // Alias khi include các mục gói liên quan đến dịch vụ này
+  foreignKey: "service_id",
+  as: "packageServiceItems",
 });
-// MỘT PackageServiceItem thuộc về MỘT Service
+
 db.PackageServiceItem.belongsTo(db.Service, {
   foreignKey: "service_id",
-  as: "serviceDefinition", // Alias khi include Service từ PackageServiceItem
+  as: "serviceDefinition",
 });
 
-// 10. Mối quan hệ giữa Category và Service
 db.Category.hasMany(db.Service, {
   foreignKey: "category_id",
   as: "services",
@@ -210,8 +178,6 @@ db.Service.belongsTo(db.Category, {
   as: "serviceCategory",
 });
 
-// Sau khi định nghĩa tất cả các models và associations, gọi associate()
-// để Sequelize thiết lập các mối quan hệ hai chiều.
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {
     db[modelName].associate(db);
