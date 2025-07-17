@@ -77,12 +77,12 @@ module.exports = (sequelize, Sequelize) => {
 
     // Mối quan hệ Product có nhiều ProductSpecification
     // (Từ index.js: db.Product.hasMany(db.ProductSpecification, { foreignKey: "product_id", as: "specifications", onDelete: "CASCADE", onUpdate: "CASCADE", });)
-    Product.hasMany(db.ProductSpecification, {
-      foreignKey: "product_id",
-      as: "specifications",
-      onDelete: "CASCADE", // Khi Product bị xóa, các specifications liên quan cũng bị xóa
-      onUpdate: "CASCADE",
-    });
+    // Product.hasMany(db.ProductSpecification, {
+    //   foreignKey: "product_id",
+    //   as: "specifications",
+    //   onDelete: "CASCADE", // Khi Product bị xóa, các specifications liên quan cũng bị xóa
+    //   onUpdate: "CASCADE",
+    // });
   };
 
   return Product;

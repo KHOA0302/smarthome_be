@@ -14,7 +14,15 @@ const sequelize = new Sequelize(dbConfig.DB, dbConfig.USER, dbConfig.PASSWORD, {
   },
 
   port: dbConfig.port,
-  logging: console.log,
+  logging: (msg) => {
+    // Log tất cả các câu lệnh SQL được thực thi
+    if (msg.startsWith("Executing")) {
+      console.log(`[SEQUELIZE QUERY]: ${msg}`);
+    } else {
+      // Log các thông báo Sequelize khác nếu cần
+      // console.log(`[SEQUELIZE INFO]: ${msg}`);
+    }
+  },
 });
 
 const db = {};
@@ -50,6 +58,8 @@ db.PackageServiceItem = require("./PackageServiceItem.js")(
 );
 
 // =============================================================== //
+db.AttributeGroup = require("./AttributeGroup.js")(sequelize, Sequelize);
+db.ProductAttribute = require("./ProductAttribute.js")(sequelize, Sequelize);
 
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {
