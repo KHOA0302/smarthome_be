@@ -21,5 +21,15 @@ module.exports = (sequelize, Sequelize) => {
       timestamps: false,
     }
   );
+
+  // Định nghĩa hàm associate
+  Role.associate = (db) => {
+    // Mối quan hệ Role có nhiều User
+    // (Từ file index.js ban đầu: db.Role.hasMany(db.User, { foreignKey: "role_id", as: "users", });)
+    Role.hasMany(db.User, {
+      foreignKey: "role_id",
+      as: "users",
+    });
+  };
   return Role;
 };

@@ -24,5 +24,15 @@ module.exports = (sequelize, Sequelize) => {
       tableName: "brands",
     }
   );
+
+  // Định nghĩa hàm associate
+  Brand.associate = (db) => {
+    // Mối quan hệ Brand có nhiều Product
+    // (Từ file index.js ban đầu: db.Brand.hasMany(db.Product, { foreignKey: "brand_id", as: "products", });)
+    Brand.hasMany(db.Product, {
+      foreignKey: "brand_id",
+      as: "products",
+    });
+  };
   return Brand;
 };

@@ -39,12 +39,22 @@ module.exports = (sequelize, Sequelize) => {
     }
   );
 
-  Service.associate = (models) => {
-    Service.belongsTo(models.Category, {
+  // Định nghĩa hàm associate
+  Service.associate = (db) => {
+    // Thay đổi 'models' thành 'db' để nhất quán
+    // Mối quan hệ Service thuộc về một Category
+    // (Từ index.js: db.Service.belongsTo(db.Category, { foreignKey: "category_id", as: "serviceCategory", });)
+    Service.belongsTo(db.Category, {
       foreignKey: "category_id",
-      as: "category",
+      as: "category", // Đã cập nhật alias theo file index.js ban đầu của bạn
+    });
+
+    // Mối quan hệ Service có nhiều PackageServiceItem
+    // (Từ index.js: db.Service.hasMany(db.PackageServiceItem, { foreignKey: "service_id", as: "packageServiceItems", });)
+    Service.hasMany(db.PackageServiceItem, {
+      foreignKey: "service_id",
+      as: "packageServiceItems",
     });
   };
-
   return Service;
 };

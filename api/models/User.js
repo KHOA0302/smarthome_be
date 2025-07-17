@@ -46,7 +46,7 @@ module.exports = (sequelize, Sequelize) => {
         },
       },
       login_method: {
-        type: Sequelize.STRING(50), 
+        type: Sequelize.STRING(50),
         allowNull: false,
         defaultValue: "traditional",
       },
@@ -56,12 +56,12 @@ module.exports = (sequelize, Sequelize) => {
         allowNull: true,
       },
       is_email_verified: {
-        type: Sequelize.BOOLEAN, 
+        type: Sequelize.BOOLEAN,
         allowNull: false,
         defaultValue: false,
       },
       is_profile_complete: {
-        type: Sequelize.BOOLEAN, 
+        type: Sequelize.BOOLEAN,
         allowNull: false,
         defaultValue: false,
       },
@@ -70,6 +70,13 @@ module.exports = (sequelize, Sequelize) => {
       timestamps: false,
     }
   );
+
+  User.associate = (db) => {
+    User.belongsTo(db.Role, {
+      foreignKey: "role_id",
+      as: "role",
+    });
+  };
 
   return User;
 };

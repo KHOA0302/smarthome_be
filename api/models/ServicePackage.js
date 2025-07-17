@@ -54,5 +54,21 @@ module.exports = (sequelize, Sequelize) => {
     }
   );
 
+  ServicePackage.associate = (db) => {
+    // Mối quan hệ ServicePackage thuộc về một ProductVariant
+    // (Từ index.js: db.ServicePackage.belongsTo(db.ProductVariant, { foreignKey: "variant_id", as: "productVariant", });)
+    ServicePackage.belongsTo(db.ProductVariant, {
+      foreignKey: "variant_id",
+      as: "productVariant",
+    });
+
+    // Mối quan hệ ServicePackage có nhiều PackageServiceItem
+    // (Từ index.js: db.ServicePackage.hasMany(db.PackageServiceItem, { foreignKey: "package_id", as: "packageItems", });)
+    ServicePackage.hasMany(db.PackageServiceItem, {
+      foreignKey: "package_id",
+      as: "packageItems",
+    });
+  };
+
   return ServicePackage;
 };

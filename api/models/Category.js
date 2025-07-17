@@ -22,5 +22,37 @@ module.exports = (sequelize, Sequelize) => {
       tableName: "categories",
     }
   );
+
+  // Định nghĩa hàm associate
+  Category.associate = (db) => {
+    // Mối quan hệ Category có nhiều Product
+    // (Từ index.js: db.Category.hasMany(db.Product, { foreignKey: "category_id", as: "products", });)
+    Category.hasMany(db.Product, {
+      foreignKey: "category_id",
+      as: "products",
+    });
+
+    // Mối quan hệ Category có nhiều Option
+    // (Từ index.js: db.Category.hasMany(db.Option, { foreignKey: "category_id", as: "options", });)
+    Category.hasMany(db.Option, {
+      foreignKey: "category_id",
+      as: "options",
+    });
+
+    // Mối quan hệ Category có nhiều Service
+    // (Từ index.js: db.Category.hasMany(db.Service, { foreignKey: "category_id", as: "services", });)
+    Category.hasMany(db.Service, {
+      foreignKey: "category_id",
+      as: "services",
+    });
+
+    // Mối quan hệ giữa Category và AttributeGroup
+    // (Từ index.js: db.Category.hasMany(db.AttributeGroup, { foreignKey: "category_id", as: "attributeGroups", });)
+    Category.hasMany(db.AttributeGroup, {
+      foreignKey: "category_id",
+      as: "attributeGroups",
+    });
+  };
+
   return Category;
 };
