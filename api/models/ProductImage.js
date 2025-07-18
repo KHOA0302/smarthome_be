@@ -36,10 +36,7 @@ module.exports = (sequelize, Sequelize) => {
     }
   );
 
-  // Định nghĩa hàm associate
   ProductImage.associate = (db) => {
-    // Mối quan hệ ProductImage thuộc về một Product
-    // (Từ index.js: db.ProductImage.belongsTo(db.Product, { foreignKey: "product_id", as: "product", });)
     ProductImage.belongsTo(db.Product, {
       foreignKey: "product_id",
       as: "product",

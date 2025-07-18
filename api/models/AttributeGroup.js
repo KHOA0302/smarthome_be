@@ -1,7 +1,6 @@
-// models/AttributeGroup.js
 module.exports = (sequelize, Sequelize) => {
   const AttributeGroup = sequelize.define(
-    "attributegroups", // Tên model
+    "attributegroups",
     {
       group_id: {
         type: Sequelize.INTEGER,
@@ -21,35 +20,21 @@ module.exports = (sequelize, Sequelize) => {
       },
     },
     {
-      timestamps: false, // Bảng này không có createdAt/updatedAt
-      tableName: "attributegroups", // Đảm bảo tên bảng khớp chính xác trong DB
+      timestamps: false,
+      tableName: "attributegroups",
     }
   );
 
   AttributeGroup.associate = (db) => {
-    console.log("--- Inside AttributeGroup.associate ---");
-    console.log(`AttributeGroup.name: ${AttributeGroup.name}`); // Expected: attributegroups
-    console.log(
-      `Attempting AttributeGroup.belongsTo(db.Category) with db.Category.name: ${
-        db.Category ? db.Category.name : "UNDEFINED"
-      }`
-    );
     AttributeGroup.belongsTo(db.Category, {
       foreignKey: "category_id",
       as: "category",
     });
-    console.log("AttributeGroup.belongsTo(db.Category) defined.");
 
-    console.log(
-      `Attempting AttributeGroup.hasMany(db.ProductAttribute) with db.ProductAttribute.name: ${
-        db.ProductAttribute ? db.ProductAttribute.name : "UNDEFINED"
-      }`
-    );
     AttributeGroup.hasMany(db.ProductAttribute, {
       foreignKey: "group_id",
-      as: "productAttributes",
+      as: "productattributes",
     });
-    console.log("AttributeGroup.hasMany(db.ProductAttribute) defined.");
   };
 
   return AttributeGroup;

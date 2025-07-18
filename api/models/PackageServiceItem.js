@@ -55,17 +55,12 @@ module.exports = (sequelize, Sequelize) => {
     }
   );
 
-  // Định nghĩa hàm associate
   PackageServiceItem.associate = (db) => {
-    // Mối quan hệ PackageServiceItem thuộc về một ServicePackage
-    // (Từ index.js: db.PackageServiceItem.belongsTo(db.ServicePackage, { foreignKey: "package_id", as: "servicePackage", });)
     PackageServiceItem.belongsTo(db.ServicePackage, {
       foreignKey: "package_id",
       as: "servicePackage",
     });
 
-    // Mối quan hệ PackageServiceItem thuộc về một Service
-    // (Từ index.js: db.PackageServiceItem.belongsTo(db.Service, { foreignKey: "service_id", as: "serviceDefinition", });)
     PackageServiceItem.belongsTo(db.Service, {
       foreignKey: "service_id",
       as: "serviceDefinition",

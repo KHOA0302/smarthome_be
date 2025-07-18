@@ -14,15 +14,6 @@ const sequelize = new Sequelize(dbConfig.DB, dbConfig.USER, dbConfig.PASSWORD, {
   },
 
   port: dbConfig.port,
-  logging: (msg) => {
-    // Log tất cả các câu lệnh SQL được thực thi
-    if (msg.startsWith("Executing")) {
-      console.log(`[SEQUELIZE QUERY]: ${msg}`);
-    } else {
-      // Log các thông báo Sequelize khác nếu cần
-      // console.log(`[SEQUELIZE INFO]: ${msg}`);
-    }
-  },
 });
 
 const db = {};

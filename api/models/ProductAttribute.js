@@ -1,7 +1,6 @@
-// models/ProductAttribute.js
 module.exports = (sequelize, Sequelize) => {
   const ProductAttribute = sequelize.define(
-    "ProductAttribute", // Tên model (PascalCase, số ít)
+    "ProductAttribute",
     {
       attribute_id: {
         type: Sequelize.INTEGER,
@@ -16,9 +15,9 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.INTEGER,
       },
       is_filterable: {
-        type: Sequelize.TINYINT, // TINYINT thường được ánh xạ thành BOOLEAN trong Sequelize, nhưng TINYINT cũng có thể dùng
+        type: Sequelize.TINYINT,
         allowNull: false,
-        defaultValue: 0, // Giá trị mặc định cho TINYINT
+        defaultValue: 0,
       },
       group_id: {
         type: Sequelize.INTEGER,
@@ -29,24 +28,16 @@ module.exports = (sequelize, Sequelize) => {
       },
     },
     {
-      timestamps: false, // Bảng này không có createdAt/updatedAt
-      tableName: "productattributes", // Đảm bảo tên bảng khớp chính xác trong DB
+      timestamps: false,
+      tableName: "productattributes",
     }
   );
 
   ProductAttribute.associate = (db) => {
-    console.log("--- Inside ProductAttribute.associate ---");
-    console.log(`ProductAttribute.name: ${ProductAttribute.name}`); // Expected: ProductAttribute
-    console.log(
-      `Attempting ProductAttribute.belongsTo(db.AttributeGroup) with db.AttributeGroup.name: ${
-        db.AttributeGroup ? db.AttributeGroup.name : "UNDEFINED"
-      }`
-    );
     ProductAttribute.belongsTo(db.AttributeGroup, {
       foreignKey: "group_id",
-      as: "attributeGroup",
+      as: "attributegroups",
     });
-    console.log("ProductAttribute.belongsTo(db.AttributeGroup) defined.");
   };
 
   return ProductAttribute;
