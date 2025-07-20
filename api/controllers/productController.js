@@ -11,12 +11,15 @@ const {
   Brand,
   Category,
   ProductImage, // <--- THÊM ProductImage vào đây
+  AttributeGroup, // <--- THÊM vào đây
+  ProductAttribute, // <--- THÊM vào đây
+  ProductSpecification, // <--- THÊM vào đây
 } = db;
 
 const { Op } = require("sequelize");
 
 const createProductWithDetails = async (req, res) => {
-  const { basic, options, variants, services } = req.body; // Dữ liệu từ frontend
+  const { basic, options, variants, services, attributes } = req.body; // Dữ liệu từ frontend
 
   let transaction;
 
@@ -75,7 +78,7 @@ const createProductWithDetails = async (req, res) => {
       const productImagesToCreate = basic.imgs.map((imageUrl, index) => ({
         product_id: productId,
         image_url: imageUrl,
-        display_order: index + 1, // Gán display_order dựa trên vị trí trong mảng
+        display_order: (index + 1) * 100000, // Gán display_order dựa trên vị trí trong mảng
       }));
 
       await ProductImage.bulkCreate(productImagesToCreate, { transaction });
@@ -262,6 +265,72 @@ const createProductWithDetails = async (req, res) => {
             }
           }
         }
+      }
+    }
+
+    // --- BƯỚC 7: XỬ LÝ PRODUCTATTRIBUTES VÀ PRODUCTSPECIFICATIONS (Tối ưu hóa việc thêm mới) ---
+    if (attributes && Array.isArray(attributes) && attributes.length > 0) {
+      // Mảng để lưu trữ TẤT CẢ các bản ghi ProductSpecification cần tạo
+      const specificationsToCreate = [];
+
+      for (const groupData of attributes) {
+        // Kiểm tra xem AttributeGroup có tồn tại không
+        const existingGroup = await AttributeGroup.findByPk(
+          groupData.group_id,
+          { transaction }
+        );
+        if (!existingGroup) {
+          throw new Error(
+            `Nhóm thuộc tính với ID ${groupData.group_id} không tồn tại.`
+          );
+        }
+
+        // Xử lý các ProductAttribute trong mỗi nhóm
+        if (groupData.attributes && Array.isArray(groupData.attributes)) {
+          for (const attrData of groupData.attributes) {
+            // Nếu thuộc tính bị xóa, bỏ qua (trong ngữ cảnh tạo mới thì có thể bỏ qua dòng này)
+            if (attrData.isRemove) continue;
+
+            // Kiểm tra xem ProductAttribute có tồn tại không
+            const existingProductAttribute = await ProductAttribute.findByPk(
+              attrData.attribute_id,
+              { transaction }
+            );
+            if (!existingProductAttribute) {
+              throw new Error(
+                `Thuộc tính sản phẩm với ID ${attrData.attribute_id} không tồn tại.`
+              );
+            }
+
+            // Xử lý ProductSpecification cho từng ProductAttribute
+            if (
+              attrData.specifications &&
+              Array.isArray(attrData.specifications)
+            ) {
+              for (const specData of attrData.specifications) {
+                // Đảm bảo có attributeValue và không rỗng
+                if (
+                  specData.attributeValue &&
+                  specData.attributeValue.trim() !== ""
+                ) {
+                  // Thêm bản ghi vào mảng thay vì tạo ngay lập tức
+                  specificationsToCreate.push({
+                    product_id: productId,
+                    attribute_id: specData.attributeId,
+                    attribute_value: specData.attributeValue.trim(),
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Thực hiện BULK INSERT (tạo hàng loạt) một lần sau khi thu thập tất cả các bản ghi
+      if (specificationsToCreate.length > 0) {
+        await ProductSpecification.bulkCreate(specificationsToCreate, {
+          transaction,
+        });
       }
     }
 

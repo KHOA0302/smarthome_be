@@ -66,12 +66,12 @@ module.exports = (sequelize, Sequelize) => {
       onUpdate: "CASCADE",
     });
 
-    // Product.hasMany(db.ProductSpecification, {
-    //   foreignKey: "product_id",
-    //   as: "specifications",
-    //   onDelete: "CASCADE", // Khi Product bị xóa, các specifications liên quan cũng bị xóa
-    //   onUpdate: "CASCADE",
-    // });
+    Product.hasMany(db.ProductSpecification, {
+      foreignKey: "product_id",
+      as: "specifications",
+      onDelete: "CASCADE", // Khi Product bị xóa, các specifications liên quan cũng bị xóa
+      onUpdate: "CASCADE",
+    });
   };
 
   return Product;

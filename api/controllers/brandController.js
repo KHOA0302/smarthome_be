@@ -61,26 +61,30 @@ const getBrandById = async (req, res) => {
 
 // Hàm để tạo một thương hiệu mới (ví dụ, chỉ dành cho Admin)
 const createBrand = async (req, res) => {
-  const { brand_name, logo_url, description } = req.body;
+  const { brand_name, logo_url } = req.body;
+
+  console.log({ brand_name, logo_url });
 
   try {
-    // Kiểm tra xem brand_name đã tồn tại chưa
+    ////////////////////////////////////////////
     const existingBrand = await Brand.findOne({
       where: { brand_name: brand_name },
     });
     if (existingBrand) {
       return res.status(409).json({ message: "Tên thương hiệu đã tồn tại." });
     }
-
+    ///////////////////////////////////////////
     const newBrand = await Brand.create({
       brand_name,
       logo_url,
-      description,
     });
 
     res.status(201).json({
       message: "Tạo thương hiệu mới thành công.",
-      data: newBrand,
+      data: {
+        newBrand: newBrand,
+        allBrands: await Brand.findAll(),
+      },
     });
   } catch (error) {
     console.error("Lỗi khi tạo thương hiệu mới:", error);

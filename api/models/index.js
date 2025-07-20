@@ -51,6 +51,10 @@ db.PackageServiceItem = require("./PackageServiceItem.js")(
 // =============================================================== //
 db.AttributeGroup = require("./AttributeGroup.js")(sequelize, Sequelize);
 db.ProductAttribute = require("./ProductAttribute.js")(sequelize, Sequelize);
+db.ProductSpecification = require("./ProductSpecification.js")(
+  sequelize,
+  Sequelize
+);
 
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {

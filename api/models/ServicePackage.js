@@ -9,7 +9,6 @@ module.exports = (sequelize, Sequelize) => {
         autoIncrement: true,
         allowNull: false,
       },
-
       variant_id: {
         type: Sequelize.INTEGER,
         allowNull: false,

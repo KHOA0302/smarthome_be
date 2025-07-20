@@ -40,7 +40,7 @@ const getAttributesByCategory = async (req, res) => {
     });
 
     if (attributeGroups.length === 0) {
-      return res.status(404).json({
+      return res.status(200).json({
         message: `Không tìm thấy nhóm thuộc tính nào cho danh mục ID ${categoryId}.`,
         data: [],
       });

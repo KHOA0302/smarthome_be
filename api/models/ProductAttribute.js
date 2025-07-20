@@ -38,6 +38,13 @@ module.exports = (sequelize, Sequelize) => {
       foreignKey: "group_id",
       as: "attributegroups",
     });
+
+    ProductAttribute.hasMany(db.ProductSpecification, {
+      foreignKey: "attribute_id",
+      as: "productspecifications",
+      onDelete: "CASCADE", // Thêm dòng này
+      onUpdate: "CASCADE", // Thêm dòng này
+    });
   };
 
   return ProductAttribute;
