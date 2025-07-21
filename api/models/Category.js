@@ -16,6 +16,20 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.INTEGER,
         allowNull: true,
       },
+      banner: {
+        type: Sequelize.STRING,
+      },
+      icon_url: {
+        type: Sequelize.STRING,
+      },
+      slogan: {
+        type: Sequelize.STRING,
+      },
+      showable: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: true,
+        allowNull: false,
+      },
     },
     {
       timestamps: false,

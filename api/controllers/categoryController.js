@@ -4,7 +4,6 @@ const Category = db.Category;
 const getAllCategories = async (req, res) => {
   try {
     const categories = await Category.findAll({
-      attributes: ["category_id", "category_name", "display_order"],
       order: [
         ["display_order", "ASC"],
         ["category_name", "ASC"],
@@ -28,12 +27,11 @@ const getAllCategories = async (req, res) => {
   }
 };
 
-
 const getCategoryById = async (req, res) => {
-  const { id } = req.params; 
+  const { id } = req.params;
 
   try {
-    const category = await Category.findByPk(id); 
+    const category = await Category.findByPk(id);
 
     if (!category) {
       return res
@@ -54,27 +52,32 @@ const getCategoryById = async (req, res) => {
   }
 };
 
-
 const createCategory = async (req, res) => {
-  const { category_name, display_order } = req.body;
+  const { name, slogan, banner, icon, displayOrder } = req.body;
 
   try {
-  
     const existingCategory = await Category.findOne({
-      where: { category_name: category_name },
+      where: { category_name: name },
     });
+
     if (existingCategory) {
       return res.status(409).json({ message: "Tên danh mục đã tồn tại." });
     }
 
     const newCategory = await Category.create({
-      category_name,
-      display_order,
+      category_name: name,
+      slogan: slogan,
+      banner: banner,
+      icon_url: icon,
+      display_order: displayOrder,
     });
 
     res.status(201).json({
       message: "Tạo danh mục mới thành công.",
-      data: newCategory,
+      data: {
+        newCategory: newCategory,
+        allCategories: await Category.findAll(),
+      },
     });
   } catch (error) {
     console.error("Lỗi khi tạo danh mục mới:", error);
@@ -84,7 +87,6 @@ const createCategory = async (req, res) => {
     });
   }
 };
-
 
 const updateCategory = async (req, res) => {
   const { id } = req.params;
@@ -115,7 +117,7 @@ const updateCategory = async (req, res) => {
     category.display_order =
       display_order !== undefined ? display_order : category.display_order;
 
-    await category.save(); 
+    await category.save();
 
     res.status(200).json({
       message: `Cập nhật danh mục với ID ${id} thành công.`,
@@ -129,7 +131,6 @@ const updateCategory = async (req, res) => {
     });
   }
 };
-
 
 const deleteCategory = async (req, res) => {
   const { id } = req.params;
@@ -147,7 +148,7 @@ const deleteCategory = async (req, res) => {
     // Ví dụ: set category_id của các sản phẩm về null hoặc xóa sản phẩm liên quan.
     // Tùy thuộc vào business logic của bạn.
 
-    await category.destroy(); 
+    await category.destroy();
 
     res.status(200).json({
       message: `Xóa danh mục với ID ${id} thành công.`,
