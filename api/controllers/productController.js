@@ -366,6 +366,348 @@ const createProductWithDetails = async (req, res) => {
   }
 };
 
+const getProductDetails = async (req, res) => {
+  const { product_id, variant_id } = req.params;
+
+  try {
+    const productDetails = await db.Product.findByPk(product_id, {
+      attributes: ["product_id", "product_name"],
+      include: [
+        {
+          model: db.ProductVariant,
+          as: "variants",
+          attributes: [
+            "variant_id",
+            "variant_sku",
+            "variant_name",
+            "price",
+            "stock_quantity",
+            "image_url",
+            "item_status",
+          ],
+          include: [
+            {
+              model: db.OptionValue,
+              as: "selectedOptionValues",
+              through: { attributes: [] },
+              include: {
+                model: db.Option,
+                as: "option",
+                attributes: ["option_id", "option_name"],
+              },
+            },
+            {
+              model: db.ServicePackage,
+              as: "servicePackages",
+              // Các thuộc tính này khớp với model ServicePackage bạn cung cấp
+              attributes: [
+                "package_id",
+                "package_name",
+                "display_order",
+                "description",
+              ],
+              include: [
+                {
+                  model: db.PackageServiceItem,
+                  as: "packageItems",
+                  attributes: [
+                    "package_service_item_id",
+                    "item_price_impact",
+                    "at_least_one",
+                    "selectable",
+                  ],
+                  include: {
+                    model: db.Service,
+                    as: "serviceDefinition",
+                    attributes: ["service_id", "service_name", "description"],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        {
+          model: db.ProductSpecification,
+          as: "specifications",
+          attributes: ["attribute_value"],
+          include: {
+            model: db.ProductAttribute,
+            as: "productAttribute",
+            attributes: [
+              "attribute_id",
+              "attribute_name",
+              "display_order",
+              "is_filterable",
+              "unit",
+            ],
+            include: {
+              model: db.AttributeGroup,
+              as: "attributegroups",
+              attributes: ["group_id", "group_name", "display_order"],
+            },
+          },
+        },
+        {
+          model: db.ProductImage,
+          as: "product_images",
+          attributes: ["img_id", "image_url", "display_order"],
+        },
+      ],
+      order: [
+        ["variants", "variant_id", "ASC"],
+        [
+          "variants",
+          { model: db.OptionValue, as: "selectedOptionValues" },
+          { model: db.Option, as: "option" },
+          "option_id",
+          "ASC",
+        ],
+        [
+          "variants",
+          { model: db.OptionValue, as: "selectedOptionValues" },
+          "option_value_id",
+          "ASC",
+        ],
+        ["product_images", "display_order", "ASC"],
+        [
+          "specifications",
+          { model: db.ProductAttribute, as: "productAttribute" },
+          { model: db.AttributeGroup, as: "attributegroups" },
+          "display_order",
+          "ASC",
+        ],
+        [
+          "specifications",
+          { model: db.ProductAttribute, as: "productAttribute" },
+          "display_order",
+          "ASC",
+        ],
+      ],
+    });
+
+    if (!productDetails) {
+      return res.status(404).json({ message: "Product not found." });
+    }
+
+    let selectedVariant = null;
+    if (variant_id) {
+      selectedVariant = productDetails.variants.find(
+        (v) => v.variant_id == variant_id
+      );
+    } else {
+      selectedVariant = productDetails.variants[0];
+    }
+
+    if (!selectedVariant) {
+      return res
+        .status(404)
+        .json({ message: "Variant not found for this product." });
+    }
+
+    // --- Định dạng lại dữ liệu để gửi về frontend ---
+
+    // a. Định dạng `allOptions` (giữ nguyên)
+    const allOptions = [];
+    const optionMap = new Map();
+
+    productDetails.variants.forEach((variant) => {
+      variant.selectedOptionValues.forEach((ov) => {
+        if (!optionMap.has(ov.option.option_id)) {
+          optionMap.set(ov.option.option_id, {
+            optionId: ov.option.option_id,
+            optionName: ov.option.option_name,
+            optionValues: [],
+          });
+        }
+        const existingOptionValues = optionMap.get(
+          ov.option.option_id
+        ).optionValues;
+        if (
+          !existingOptionValues.some(
+            (val) => val.valueId === ov.option_value_id
+          )
+        ) {
+          existingOptionValues.push({
+            valueId: ov.option_value_id,
+            valueName: ov.option_value_name,
+            selected: false,
+          });
+        }
+      });
+    });
+
+    optionMap.forEach((option) => {
+      option.optionValues.sort((a, b) => a.valueId - b.valueId);
+      allOptions.push(option);
+    });
+    allOptions.sort((a, b) => a.optionId - b.optionId);
+
+    if (selectedVariant) {
+      allOptions.forEach((option) => {
+        option.optionValues.forEach((value) => {
+          if (
+            selectedVariant.selectedOptionValues.some(
+              (sov) => sov.option_value_id === value.valueId
+            )
+          ) {
+            value.selected = true;
+          }
+        });
+      });
+    }
+
+    // b. Định dạng `servicePackages`
+    const servicePackages = selectedVariant.servicePackages.sort(
+      (a, b) => (a.display_order || Infinity) - (b.display_order || Infinity)
+    ); // Sắp xếp các gói dịch vụ theo display_order
+
+    let lowestDisplayOrderPackageId = null;
+    if (servicePackages.length > 0) {
+      lowestDisplayOrderPackageId = servicePackages[0].package_id;
+    }
+
+    const formattedServicePackages = servicePackages.map((pkg) => {
+      return {
+        packageId: pkg.package_id,
+        packageName: pkg.package_name,
+        price: pkg.packageItems.reduce(
+          (sum, item) => sum + parseFloat(item.item_price_impact),
+          0
+        ),
+        displayOrder: pkg.display_order,
+        isDefault: pkg.is_default,
+        description: pkg.description,
+        // Gói có display_order thấp nhất sẽ có selected: true
+        selected: pkg.package_id === lowestDisplayOrderPackageId,
+        items: pkg.packageItems.map((item) => ({
+          itemId: item.serviceDefinition.service_id,
+          itemName: item.serviceDefinition.service_name,
+          itemPriceImpact: parseFloat(item.item_price_impact),
+          atLeastOne: item.at_least_one,
+          selectable: item.selectable,
+          description: item.serviceDefinition.description,
+          selected: true, // Mặc định tất cả item trong gói là true
+        })),
+      };
+    });
+
+    // c. Định dạng `groupAttributes` với cấu trúc model mới (giữ nguyên)
+    const groupAttributesMap = new Map();
+
+    productDetails.specifications.forEach((spec) => {
+      const attribute = spec.productAttribute;
+      const attributeGroup = attribute.attributegroups;
+
+      if (!attributeGroup) {
+        console.warn(
+          `ProductAttribute with ID ${attribute.attribute_id} has no associated AttributeGroup.`
+        );
+        return;
+      }
+
+      const groupName = attributeGroup.group_name;
+      const groupDisplayOrder = attributeGroup.display_order;
+      const groupId = attributeGroup.group_id;
+
+      if (!groupAttributesMap.has(groupId)) {
+        groupAttributesMap.set(groupId, {
+          groupId: groupId,
+          groupName: groupName,
+          groupDisplayOrder: groupDisplayOrder,
+          attributes: new Map(),
+        });
+      }
+
+      const currentGroup = groupAttributesMap.get(groupId);
+      if (!currentGroup.attributes.has(attribute.attribute_id)) {
+        currentGroup.attributes.set(attribute.attribute_id, {
+          attributeId: attribute.attribute_id,
+          attributeName: attribute.attribute_name,
+          displayOrder: attribute.display_order,
+          isFilterable: attribute.is_filterable,
+          unit: attribute.unit,
+          attributeValues: [],
+        });
+      }
+      currentGroup.attributes
+        .get(attribute.attribute_id)
+        .attributeValues.push(spec.attribute_value);
+    });
+
+    const groupAttributes = Array.from(groupAttributesMap.values())
+      .map((group) => {
+        const attributesArray = Array.from(group.attributes.values()).sort(
+          (a, b) => (a.displayOrder || 999) - (b.displayOrder || 999)
+        );
+
+        attributesArray.forEach((attr) => {
+          attr.attributeValues = Array.from(
+            new Set(attr.attributeValues)
+          ).sort();
+        });
+
+        return {
+          groupId: group.groupId,
+          groupName: group.groupName,
+          groupDisplayOrder: group.groupDisplayOrder,
+          attributes: attributesArray,
+        };
+      })
+      .sort(
+        (a, b) => (a.groupDisplayOrder || 999) - (b.groupDisplayOrder || 999)
+      );
+
+    // d. Định dạng `variants` (danh sách tất cả variants của sản phẩm gốc) (giữ nguyên)
+    const allVariants = productDetails.variants.map((v) => ({
+      variantId: v.variant_id,
+      variantSku: v.variant_sku,
+      variantName: v.variant_name,
+      price: parseFloat(v.price),
+      stockQuantity: v.stock_quantity,
+      imageUrl: v.image_url,
+      itemStatus: v.item_status,
+      optionValueIds: v.selectedOptionValues
+        .map((ov) => ov.option_value_id)
+        .sort(),
+    }));
+
+    // --- 5. Trả về phản hồi ---
+    res.status(200).json({
+      base: {
+        productId: productDetails.product_id,
+        productName: productDetails.product_name,
+        productImages: productDetails.product_images.map((img) => ({
+          imgId: img.img_id,
+          imageUrl: img.image_url,
+          displayOrder: img.display_order,
+        })),
+      },
+      selectedVariant: {
+        variantId: selectedVariant.variant_id,
+        variantSku: selectedVariant.variant_sku,
+        variantName: selectedVariant.variant_name,
+        price: parseFloat(selectedVariant.price),
+        stockQuantity: selectedVariant.stock_quantity,
+        imageUrl: selectedVariant.image_url,
+        itemStatus: selectedVariant.item_status,
+        optionValueIds: selectedVariant.selectedOptionValues
+          .map((ov) => ov.option_value_id)
+          .sort(),
+      },
+      allOptions: allOptions,
+      variants: allVariants,
+      servicePackages: formattedServicePackages, // Sử dụng biến mới đã định dạng
+      groupAttributes: groupAttributes,
+    });
+  } catch (error) {
+    console.error("Error fetching product details:", error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
+};
+
 module.exports = {
   createProductWithDetails,
+  getProductDetails,
 };

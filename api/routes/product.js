@@ -11,4 +11,9 @@ router.post(
   productController.createProductWithDetails
 );
 
+router.get(
+  "/:product_id/variant/:variant_id",
+  productController.getProductDetails
+);
+
 module.exports = router;

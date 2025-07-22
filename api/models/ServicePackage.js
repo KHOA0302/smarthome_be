@@ -17,10 +17,6 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.STRING(255),
         allowNull: false,
       },
-      is_default: {
-        type: Sequelize.BOOLEAN,
-        allowNull: true,
-      },
       display_order: {
         type: Sequelize.INTEGER,
         allowNull: true,
