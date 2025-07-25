@@ -5,13 +5,19 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const db = require("../models");
 const User = db.User;
+const Cart = db.Cart;
+const CartItem = db.CartItem;
+const CartItemService = db.CartItemService;
+const ProductVariant = db.ProductVariant;
 
 const handleLoginAttemp = async (req, res) => {
   const { password, username } = req.body;
-
-  console.log({ username, password });
+  const t = await db.sequelize.transaction();
 
   try {
+    const { sessionId } = req;
+    console.log({ username, password, sessionId });
+
     const user = await User.findOne({
       where: { email: username },
       include: [
@@ -21,17 +27,154 @@ const handleLoginAttemp = async (req, res) => {
           attributes: ["role_name"],
         },
       ],
+      transaction: t,
     });
 
     if (!user) {
+      await t.rollback();
       return res.status(400).json({ message: "Tên đăng nhập không tồn tại." });
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!isMatch) {
+      await t.rollback();
       return res.status(400).json({ message: "Mật khẩu không đúng." });
     }
+
+    // --- LOGIC GỘP GIỎ HÀNG VÀ KIỂM TRA TỒN KHO PHỨC TẠP ---
+    if (sessionId) {
+      const guestCart = await Cart.findOne({
+        where: { session_id: sessionId },
+        include: [
+          {
+            model: CartItem,
+            as: "cartItems",
+            include: [{ model: CartItemService, as: "cartItemServices" }],
+          },
+        ],
+        transaction: t,
+      });
+
+      if (guestCart) {
+        const userCart = await Cart.findOne({
+          where: { user_id: user.user_id },
+          include: [
+            {
+              model: CartItem,
+              as: "cartItems",
+              include: [{ model: CartItemService, as: "cartItemServices" }],
+            },
+          ],
+          transaction: t,
+        });
+
+        // 1. Tính tổng số lượng của từng variant_id từ cả hai giỏ hàng
+        const combinedQuantity = new Map();
+        const processItems = (items) => {
+          if (items && items.length > 0) {
+            items.forEach((item) => {
+              const currentQuantity =
+                combinedQuantity.get(item.variant_id) || 0;
+              combinedQuantity.set(
+                item.variant_id,
+                currentQuantity + item.quantity
+              );
+            });
+          }
+        };
+
+        processItems(userCart ? userCart.cartItems : []);
+        processItems(guestCart.cartItems);
+
+        // 2. Lấy tất cả ProductVariant để kiểm tra tồn kho
+        const allVariantIds = [...combinedQuantity.keys()];
+        const productVariants = await ProductVariant.findAll({
+          where: { variant_id: allVariantIds },
+          transaction: t,
+        });
+        const productVariantMap = new Map(
+          productVariants.map((pv) => [pv.variant_id, pv])
+        );
+
+        // 3. Kiểm tra tồn kho trước khi gộp
+        for (const [variantId, totalQuantity] of combinedQuantity.entries()) {
+          const variant = productVariantMap.get(variantId);
+
+          if (!variant) {
+            await t.rollback();
+            return res.status(404).json({
+              message: `Không tìm thấy một sản phẩm trong giỏ hàng. Vui lòng kiểm tra lại.`,
+            });
+          }
+
+          if (totalQuantity > variant.stock_quantity) {
+            await t.rollback();
+            return res.status(400).json({
+              message: `Không đủ số lượng tồn kho cho sản phẩm "${variant.variant_name}" sau khi gộp giỏ hàng.`,
+            });
+          }
+        }
+
+        // 4. Nếu tồn kho đủ, thực hiện gộp giỏ hàng
+        if (!userCart) {
+          // Trường hợp 1: User chưa có giỏ hàng. Chuyển giỏ hàng của khách.
+          await guestCart.update(
+            { user_id: user.user_id, session_id: null },
+            { transaction: t }
+          );
+        } else {
+          // Trường hợp 2: User đã có giỏ hàng. Gộp giỏ hàng của khách vào của user.
+          for (const guestItem of guestCart.cartItems) {
+            const guestServiceItemsHash = guestItem.cartItemServices
+              .map((s) => s.package_service_item_id)
+              .sort()
+              .join(",");
+
+            let existingUserItem = null;
+            if (userCart.cartItems) {
+              for (const userItem of userCart.cartItems) {
+                if (userItem.variant_id === guestItem.variant_id) {
+                  const userServiceItemsHash = userItem.cartItemServices
+                    .map((s) => s.package_service_item_id)
+                    .sort()
+                    .join(",");
+                  if (userServiceItemsHash === guestServiceItemsHash) {
+                    existingUserItem = userItem;
+                    break;
+                  }
+                }
+              }
+            }
+
+            if (existingUserItem) {
+              await existingUserItem.update(
+                { quantity: existingUserItem.quantity + guestItem.quantity },
+                { transaction: t }
+              );
+            } else {
+              await guestItem.update(
+                { cart_id: userCart.cart_id },
+                { transaction: t }
+              );
+            }
+          }
+
+          // Bổ sung: Xóa thủ công tất cả cartItems của giỏ hàng khách
+          // trước khi xóa giỏ hàng đó
+          if (guestCart.cartItems.length > 0) {
+            await CartItem.destroy({
+              where: { cart_id: guestCart.cart_id },
+              transaction: t,
+            });
+          }
+
+          // Sau khi gộp và xóa items xong, xóa giỏ hàng cũ của khách
+          await guestCart.destroy({ transaction: t });
+        }
+      }
+    }
+    // --- KẾT THÚC LOGIC GỘP GIỎ HÀNG ---
 
     const payload = {
       user_id: user.user_id,
@@ -42,6 +185,10 @@ const handleLoginAttemp = async (req, res) => {
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
 
+    // Commit transaction chỉ khi tất cả các bước trên thành công
+    await t.commit();
+
+    // Gửi phản hồi thành công cuối cùng
     res.status(200).json({
       message: "Đăng nhập thành công!",
       token: token,
@@ -55,17 +202,18 @@ const handleLoginAttemp = async (req, res) => {
     });
     console.log("Login success!!");
   } catch (err) {
-    console.error("Lỗi đăng nhập:", error);
+    // Luôn luôn rollback nếu có lỗi xảy ra
+    await t.rollback();
+    console.error("Lỗi đăng nhập:", err);
     res
       .status(500)
-      .json({ message: "Lỗi máy chủ nội bộ.", error: error.message });
+      .json({ message: "Lỗi máy chủ nội bộ.", error: err.message });
   }
 };
 
 const handleRegister = async (req, res) => {
   const { email, password, full_name } = req.body;
   try {
-
     if (!email || !password || !full_name) {
       return res
         .status(400)
@@ -129,7 +277,7 @@ const handleGoogle = async (req, res) => {
 
     const payload = ticket.getPayload();
     console.log("Google Payload:", payload);
-    const googleUserId = payload["sub"]; 
+    const googleUserId = payload["sub"];
     const email = payload["email"];
     const fullName = payload["name"];
     const avatar = payload["picture"];
@@ -151,7 +299,7 @@ const handleGoogle = async (req, res) => {
         console.log(
           `Email ${email} đã có tài khoản truyền thống. Liên kết với Google.`
         );
-     
+
         existingTraditionalUser.google_sub_id = googleUserId;
         existingTraditionalUser.is_email_verified = isEmailVerifiedByGoogle;
         existingTraditionalUser.full_name =
@@ -171,7 +319,7 @@ const handleGoogle = async (req, res) => {
             is_profile_complete: user.is_profile_complete,
           },
         });
-        return; 
+        return;
       } else {
         console.log(`Tạo tài khoản mới cho ${email} qua Google.`);
         user = await User.create({
@@ -236,7 +384,7 @@ const generateAuthToken = (user) => {
     email: user.email,
     role_id: user.role_id,
   };
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" }); 
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
 };
 
 module.exports = { handleLoginAttemp, handleRegister, handleGoogle };

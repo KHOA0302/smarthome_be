@@ -10,28 +10,18 @@ const {
   PackageServiceItem,
   Brand,
   Category,
-  ProductImage, // <--- THÊM ProductImage vào đây
-  AttributeGroup, // <--- THÊM vào đây
-  ProductAttribute, // <--- THÊM vào đây
-  ProductSpecification, // <--- THÊM vào đây
+  ProductImage,
+  AttributeGroup,
+  ProductAttribute,
+  ProductSpecification,
 } = db;
 
 const { Op } = require("sequelize");
 
 const createProductWithDetails = async (req, res) => {
-  const { basic, options, variants, services, attributes } = req.body; // Dữ liệu từ frontend
+  const { basic, options, variants, services, attributes } = req.body;
 
   let transaction;
-
-  // --- LOGGING ĐỂ DEBUG ---
-  console.log("------------------- BẮT ĐẦU TẠO SẢN PHẨM -------------------");
-  console.log(
-    "Dữ liệu nhận được từ req.body:",
-    JSON.stringify(req.body, null, 2)
-  );
-  console.log("Thông tin cơ bản (basic):", basic);
-  console.log("Tên sản phẩm (basic.name):", basic ? basic.name : "Không có");
-  console.log("----------------------------------------------------------");
 
   try {
     transaction = await db.sequelize.transaction();
@@ -85,8 +75,7 @@ const createProductWithDetails = async (req, res) => {
     }
 
     // --- BƯỚC 4: XỬ LÝ OPTIONS VÀ OPTIONVALUES ---
-    const optionValueMap = new Map(); // Map: "value_name" -> option_value_id
-
+    const optionValueMap = new Map();
     if (options && Array.isArray(options)) {
       for (const optData of options) {
         const existingOption = await Option.findByPk(optData.optionId, {
@@ -119,8 +108,7 @@ const createProductWithDetails = async (req, res) => {
     }
 
     // --- BƯỚC 5: XỬ LÝ PRODUCTVARIANTS VÀ VARIANTOPTIONSELECTIONS ---
-    const variantIdMap = new Map(); // Map: SKU -> variant_id
-
+    const variantIdMap = new Map();
     if (variants && Array.isArray(variants)) {
       for (const variantData of variants) {
         if (variantData.isRemove) continue;
@@ -270,11 +258,9 @@ const createProductWithDetails = async (req, res) => {
 
     // --- BƯỚC 7: XỬ LÝ PRODUCTATTRIBUTES VÀ PRODUCTSPECIFICATIONS (Tối ưu hóa việc thêm mới) ---
     if (attributes && Array.isArray(attributes) && attributes.length > 0) {
-      // Mảng để lưu trữ TẤT CẢ các bản ghi ProductSpecification cần tạo
       const specificationsToCreate = [];
 
       for (const groupData of attributes) {
-        // Kiểm tra xem AttributeGroup có tồn tại không
         const existingGroup = await AttributeGroup.findByPk(
           groupData.group_id,
           { transaction }
@@ -285,13 +271,10 @@ const createProductWithDetails = async (req, res) => {
           );
         }
 
-        // Xử lý các ProductAttribute trong mỗi nhóm
         if (groupData.attributes && Array.isArray(groupData.attributes)) {
           for (const attrData of groupData.attributes) {
-            // Nếu thuộc tính bị xóa, bỏ qua (trong ngữ cảnh tạo mới thì có thể bỏ qua dòng này)
             if (attrData.isRemove) continue;
 
-            // Kiểm tra xem ProductAttribute có tồn tại không
             const existingProductAttribute = await ProductAttribute.findByPk(
               attrData.attribute_id,
               { transaction }
@@ -302,18 +285,15 @@ const createProductWithDetails = async (req, res) => {
               );
             }
 
-            // Xử lý ProductSpecification cho từng ProductAttribute
             if (
               attrData.specifications &&
               Array.isArray(attrData.specifications)
             ) {
               for (const specData of attrData.specifications) {
-                // Đảm bảo có attributeValue và không rỗng
                 if (
                   specData.attributeValue &&
                   specData.attributeValue.trim() !== ""
                 ) {
-                  // Thêm bản ghi vào mảng thay vì tạo ngay lập tức
                   specificationsToCreate.push({
                     product_id: productId,
                     attribute_id: specData.attributeId,
@@ -326,7 +306,6 @@ const createProductWithDetails = async (req, res) => {
         }
       }
 
-      // Thực hiện BULK INSERT (tạo hàng loạt) một lần sau khi thu thập tất cả các bản ghi
       if (specificationsToCreate.length > 0) {
         await ProductSpecification.bulkCreate(specificationsToCreate, {
           transaction,
@@ -399,7 +378,6 @@ const getProductDetails = async (req, res) => {
             {
               model: db.ServicePackage,
               as: "servicePackages",
-              // Các thuộc tính này khớp với model ServicePackage bạn cung cấp
               attributes: [
                 "package_id",
                 "package_name",
@@ -504,9 +482,6 @@ const getProductDetails = async (req, res) => {
         .json({ message: "Variant not found for this product." });
     }
 
-    // --- Định dạng lại dữ liệu để gửi về frontend ---
-
-    // a. Định dạng `allOptions` (giữ nguyên)
     const allOptions = [];
     const optionMap = new Map();
 
@@ -556,11 +531,9 @@ const getProductDetails = async (req, res) => {
       });
     }
 
-    // b. Định dạng `servicePackages`
     const servicePackages = selectedVariant.servicePackages.sort(
       (a, b) => (a.display_order || Infinity) - (b.display_order || Infinity)
-    ); // Sắp xếp các gói dịch vụ theo display_order
-
+    );
     let lowestDisplayOrderPackageId = null;
     if (servicePackages.length > 0) {
       lowestDisplayOrderPackageId = servicePackages[0].package_id;
@@ -570,28 +543,22 @@ const getProductDetails = async (req, res) => {
       return {
         packageId: pkg.package_id,
         packageName: pkg.package_name,
-        price: pkg.packageItems.reduce(
-          (sum, item) => sum + parseFloat(item.item_price_impact),
-          0
-        ),
+
         displayOrder: pkg.display_order,
-        isDefault: pkg.is_default,
-        description: pkg.description,
-        // Gói có display_order thấp nhất sẽ có selected: true
         selected: pkg.package_id === lowestDisplayOrderPackageId,
         items: pkg.packageItems.map((item) => ({
-          itemId: item.serviceDefinition.service_id,
+          itemId: item.package_service_item_id,
+          serviceId: item.serviceDefinition.service_id,
           itemName: item.serviceDefinition.service_name,
           itemPriceImpact: parseFloat(item.item_price_impact),
           atLeastOne: item.at_least_one,
           selectable: item.selectable,
           description: item.serviceDefinition.description,
-          selected: true, // Mặc định tất cả item trong gói là true
+          selected: true,
         })),
       };
     });
 
-    // c. Định dạng `groupAttributes` với cấu trúc model mới (giữ nguyên)
     const groupAttributesMap = new Map();
 
     productDetails.specifications.forEach((spec) => {
@@ -657,7 +624,6 @@ const getProductDetails = async (req, res) => {
         (a, b) => (a.groupDisplayOrder || 999) - (b.groupDisplayOrder || 999)
       );
 
-    // d. Định dạng `variants` (danh sách tất cả variants của sản phẩm gốc) (giữ nguyên)
     const allVariants = productDetails.variants.map((v) => ({
       variantId: v.variant_id,
       variantSku: v.variant_sku,
@@ -671,7 +637,6 @@ const getProductDetails = async (req, res) => {
         .sort(),
     }));
 
-    // --- 5. Trả về phản hồi ---
     res.status(200).json({
       base: {
         productId: productDetails.product_id,
@@ -696,7 +661,7 @@ const getProductDetails = async (req, res) => {
       },
       allOptions: allOptions,
       variants: allVariants,
-      servicePackages: formattedServicePackages, // Sử dụng biến mới đã định dạng
+      servicePackages: formattedServicePackages,
       groupAttributes: groupAttributes,
     });
   } catch (error) {

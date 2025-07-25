@@ -56,6 +56,11 @@ db.ProductSpecification = require("./ProductSpecification.js")(
   Sequelize
 );
 
+// =============================================================== //
+db.Cart = require("./Cart.js")(sequelize, Sequelize);
+db.CartItem = require("./CartItem.js")(sequelize, Sequelize);
+db.CartItemService = require("./CartItemService.js")(sequelize, Sequelize);
+
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {
     db[modelName].associate(db);

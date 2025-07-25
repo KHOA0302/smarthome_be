@@ -28,15 +28,7 @@ module.exports = (sequelize, Sequelize) => {
       address: {
         type: Sequelize.STRING,
       },
-      created_at: {
-        type: Sequelize.DATE,
-        defaultValue: Sequelize.NOW,
-      },
-      updated_at: {
-        type: Sequelize.DATE,
-        defaultValue: Sequelize.NOW,
-        onUpdate: Sequelize.NOW,
-      },
+
       role_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
@@ -65,6 +57,15 @@ module.exports = (sequelize, Sequelize) => {
         allowNull: false,
         defaultValue: false,
       },
+      created_at: {
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.NOW,
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.NOW,
+        onUpdate: Sequelize.NOW,
+      },
     },
     {
       timestamps: false,
@@ -75,6 +76,11 @@ module.exports = (sequelize, Sequelize) => {
     User.belongsTo(db.Role, {
       foreignKey: "role_id",
       as: "role",
+    });
+
+    User.hasMany(db.Cart, {
+      foreignKey: "user_id",
+      as: "carts",
     });
   };
 

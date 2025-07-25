@@ -11,6 +11,7 @@ const optionRouter = require("./routes/option");
 const serviceRouter = require("./routes/service");
 const productRouter = require("./routes/product");
 const attributeRouter = require("./routes/attribute");
+const cartRouter = require("./routes/cart");
 
 const cors = require("cors");
 
@@ -27,5 +28,6 @@ app.use("/option", optionRouter);
 app.use("/service-package", serviceRouter);
 app.use("/product", productRouter);
 app.use("/attribute", attributeRouter);
+app.use("/cart", cartRouter);
 
 module.exports = app;

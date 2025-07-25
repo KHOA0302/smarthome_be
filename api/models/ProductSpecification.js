@@ -26,9 +26,6 @@ module.exports = (sequelize, Sequelize) => {
     }
   );
 
-  // If you need to define associations, you would do so here.
-  // For example, if product_id references a 'Product' table and
-  // attribute_id references an 'Attribute' table:
   ProductSpecification.associate = (db) => {
     ProductSpecification.belongsTo(db.Product, {
       foreignKey: "product_id",
