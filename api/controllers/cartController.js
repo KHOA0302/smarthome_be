@@ -1,4 +1,148 @@
 const db = require("../models");
+const {
+  Cart,
+  CartItem,
+  ProductVariant,
+  CartItemService,
+  Option,
+  OptionValue,
+  Service,
+} = db;
+
+const getCartItem = async (req, res) => {
+  try {
+    let cartIdentifier = {};
+    const userId = req.isGuest ? null : req.user.id;
+    const sessionId = req.isGuest ? req.sessionId : null;
+
+    if (userId) {
+      cartIdentifier = { user_id: userId };
+    } else if (sessionId) {
+      cartIdentifier = { session_id: sessionId };
+    } else {
+      return res
+        .status(400)
+        .json({ message: "Không tìm thấy thông tin giỏ hàng." });
+    }
+
+    const cart = await Cart.findOne({
+      where: cartIdentifier,
+      include: [
+        {
+          model: CartItem,
+          as: "cartItems",
+          include: [
+            {
+              model: ProductVariant,
+              as: "productVariant",
+              include: [
+                {
+                  model: OptionValue,
+                  as: "selectedOptionValues",
+                  include: [
+                    {
+                      model: Option,
+                      as: "option",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              model: CartItemService,
+              as: "cartItemServices",
+              include: [
+                {
+                  model: db.PackageServiceItem,
+                  as: "packageServiceItem",
+                  include: [
+                    {
+                      model: Service,
+                      as: "serviceDefinition",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!cart) {
+      return res
+        .status(200)
+        .json({ message: "Giỏ hàng trống.", cartItems: [] });
+    }
+
+    // 2. Định dạng lại payload
+    const cartItemsPayload = cart.cartItems.map((cartItem) => {
+      const productVariant = cartItem.productVariant;
+
+      // Xử lý options
+      const optionsMap = new Map();
+      if (
+        productVariant.selectedOptionValues &&
+        productVariant.selectedOptionValues.length > 0
+      ) {
+        productVariant.selectedOptionValues.forEach((optionValue) => {
+          const option = optionsMap.get(optionValue.option.option_id);
+          if (!option) {
+            optionsMap.set(optionValue.option.option_id, {
+              optionId: optionValue.option.option_id,
+              optionName: optionValue.option.option_name,
+              optionValue: {
+                valueId: optionValue.option_value_id,
+                valueName: optionValue.option_value_name,
+              },
+            });
+          }
+        });
+      }
+      const optionsPayload = [...optionsMap.values()];
+
+      // Xử lý services
+      const servicesPayload = cartItem.cartItemServices.map(
+        (cartItemService) => {
+          const packageServiceItem = cartItemService.packageServiceItem;
+          return {
+            serviceId: packageServiceItem.serviceDefinition.service_id,
+            serviceName: packageServiceItem.serviceDefinition.service_name,
+            price: cartItemService.price,
+            // Có thể thêm các trường khác nếu cần
+          };
+        }
+      );
+
+      // Tạo object cuối cùng
+      return {
+        cartItemId: cartItem.cart_item_id,
+        variant: {
+          productId: productVariant.product_id,
+          variantId: productVariant.variant_id,
+          variantName: productVariant.variant_name,
+          price: productVariant.price,
+          imageUrl: productVariant.image_url,
+          // ... thêm các thông tin variant khác nếu cần
+        },
+        options: optionsPayload,
+        quantity: cartItem.quantity,
+        price: cartItem.price,
+        services: servicesPayload,
+      };
+    });
+
+    res.status(200).json({
+      cartId: cart.cart_id,
+      cartItems: cartItemsPayload,
+    });
+  } catch (error) {
+    console.error("Lỗi khi lấy thông tin giỏ hàng:", error);
+    res
+      .status(500)
+      .json({ message: "Lỗi máy chủ nội bộ.", error: error.message });
+  }
+};
 
 const createCartItem = async (req, res) => {
   const { variant, servicePackage } = req.body;
@@ -179,4 +323,5 @@ const createCartItem = async (req, res) => {
 
 module.exports = {
   createCartItem,
+  getCartItem,
 };

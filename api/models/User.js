@@ -25,10 +25,15 @@ module.exports = (sequelize, Sequelize) => {
       phone_number: {
         type: Sequelize.STRING,
       },
-      address: {
+      province: {
         type: Sequelize.STRING,
       },
-
+      district: {
+        type: Sequelize.STRING,
+      },
+      house_number: {
+        type: Sequelize.STRING,
+      },
       role_id: {
         type: Sequelize.INTEGER,
         allowNull: false,

@@ -378,6 +378,31 @@ const handleGoogle = async (req, res) => {
   }
 };
 
+const getUserInfo = async (req, res) => {
+  try {
+    const user = await User.findOne({
+      where: { user_id: req.user.id },
+      attributes: [
+        "full_name",
+        "phone_number",
+        "province",
+        "district",
+        "house_number",
+        "is_profile_complete",
+      ],
+    });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({
+      message: "Lỗi máy chủ nội bộ khi lấy được thông tin người dùng.",
+      error: error.message,
+    });
+  }
+};
+
 const generateAuthToken = (user) => {
   const payload = {
     user_id: user.user_id,
@@ -387,4 +412,9 @@ const generateAuthToken = (user) => {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
 };
 
-module.exports = { handleLoginAttemp, handleRegister, handleGoogle };
+module.exports = {
+  handleLoginAttemp,
+  handleRegister,
+  handleGoogle,
+  getUserInfo,
+};

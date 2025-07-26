@@ -9,6 +9,6 @@ router.post("/register", authController.handleRegister);
 
 router.post("/google", authController.handleGoogle);
 
-router.post("/google/callback", () => {});
+router.get("/user-info", identifyUserOrGuest, authController.getUserInfo);
 
 module.exports = router;
