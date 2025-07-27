@@ -82,6 +82,11 @@ module.exports = (sequelize, Sequelize) => {
       foreignKey: "variant_id",
       as: "cartItems",
     });
+
+    ProductVariant.hasMany(db.OrderItem, {
+      foreignKey: "variant_id",
+      as: "OrderItems",
+    });
   };
 
   return ProductVariant;

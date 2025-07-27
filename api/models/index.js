@@ -61,6 +61,11 @@ db.Cart = require("./Cart.js")(sequelize, Sequelize);
 db.CartItem = require("./CartItem.js")(sequelize, Sequelize);
 db.CartItemService = require("./CartItemService.js")(sequelize, Sequelize);
 
+//============================================================//
+db.Order = require("./Order.js")(sequelize, Sequelize);
+db.OrderItem = require("./OrderItem.js")(sequelize, Sequelize);
+db.OrderItemService = require("./OrderItemService.js")(sequelize, Sequelize);
+
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {
     db[modelName].associate(db);
