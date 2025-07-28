@@ -24,4 +24,10 @@ router.get(
   orderController.getOrderQuarterlyRevenue
 );
 
+router.get(
+  "/check-vnpay",
+  orderController.checkVNPay
+);
+
+
 module.exports = router;

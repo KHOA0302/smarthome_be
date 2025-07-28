@@ -12,6 +12,8 @@ const paymentStrategies = {
   vnpay: createVnpayOrder,
 };
 
+const { Order, Cart } = require("../models");
+
 const createOrder = async (req, res) => {
   const { cartId, method } = req.body;
 
@@ -113,4 +115,65 @@ const getOrderQuarterlyRevenue = async (req, res) => {
   }
 };
 
-module.exports = { createOrder, getOrder, getOrderQuarterlyRevenue };
+const checkVNPay = async (req, res) => {
+  try {
+    const queryParams = req.query;
+
+    const vnpay = new VNPay({
+      tmnCode: "0TSSC1QT",
+      secureSecret: "OTYGF8UKW9QVWWTE0BTY82Z1P3LOUA47",
+    });
+
+    const isValidSignature = vnpay.verifyReturnUrl(queryParams);
+
+    if (!isValidSignature.isVerified || !isValidSignature.isSuccess) {
+      await Order.destroy({ where: { order_id: orderId } });
+      return res.redirect(
+        "https://your-frontend.com/payment-fail?error=invalid-signature"
+      );
+    }
+
+    const { vnp_TxnRef, vnp_ResponseCode, userId, sessionId } = queryParams;
+    const orderId = vnp_TxnRef;
+    if (vnp_ResponseCode === "00") {
+      console.log("✅ Payment success:", vnp_TxnRef);
+
+      if (userId) {
+        await Cart.destroy({ where: { user_id: userId } });
+      }
+
+      if (sessionId) {
+        await Cart.destroy({ where: { session_id: sessionId } });
+      }
+
+      return res.redirect(
+        // Trở về trang thanh toán thành công với query orderId
+        `http://your-frontend.com/payment-success?orderId=${orderId}`
+      );
+    } else {
+      console.warn("❌ Payment failed:", vnp_TxnRef);
+
+      await Order.destroy({ where: { order_id: orderId } });
+
+      return res.redirect(
+        // Trở về trang thanh toán thất bại
+        `http://your-frontend.com/payment-fail`
+      );
+    }
+  } catch (error) {
+    console.error("Error in checkVNPay controller:", error);
+
+    res.status(500).send({
+      message:
+        error.message ||
+        "An unexpected error occurred while fetching revenue data.",
+    });
+  }
+};
+
+module.exports = {
+  createOrder,
+  getOrder,
+  getOrderQuarterlyRevenue,
+  checkVNPay,
+};
