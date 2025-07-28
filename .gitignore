@@ -2,3 +2,4 @@ node_modules/
 .env
 server.js
 reload.js
+api-docs/

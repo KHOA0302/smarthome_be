@@ -1,7 +1,8 @@
 const { VNPay, dateFormat } = require("vnpay");
+const db = require("../../models");
 
 const createVnpayOrder = async (orderData) => {
-  const newOrder = await db.sequelize.transaction(async (t) => {
+  const result = await db.sequelize.transaction(async (t) => {
     const cart = await db.Cart.findByPk(orderData.cartId, {
       include: [
         {
@@ -111,7 +112,7 @@ const createVnpayOrder = async (orderData) => {
         user_id: cart.user_id,
         ...orderData.guestInfo,
         order_total: orderTotal, // Đưa tổng giá đã tính vào đây
-        payment_method: "traditional",
+        payment_method: "vnpay",
         payment_status: "unpaid",
         order_status: "pending",
       },
@@ -153,34 +154,35 @@ const createVnpayOrder = async (orderData) => {
       transaction: t,
     });
 
-    return newOrder;
+    const vnpay = new VNPay({
+      tmnCode: "0TSSC1QT",
+      secureSecret: "OTYGF8UKW9QVWWTE0BTY82Z1P3LOUA47",
+    });
+
+    const currentDate = new Date();
+    const vnp_CreateDate = dateFormat(currentDate);
+    const vnp_ExpireDate = dateFormat(
+      new Date(currentDate.getTime() + 30 * 60 * 1000)
+    ); // 30 phút
+
+    const vnp_ReturnUrl = orderData.userId
+      ? `http://localhost:8000/order/check-vnpay?userId=${orderData.userId}`
+      : `http://localhost:8000/order/check-vnpay?sessionId=${orderData.sessionId}`;
+
+    const vnpayUrl = vnpay.buildPaymentUrl({
+      vnp_Amount: newOrder.order_total,
+      vnp_TxnRef: `${newOrder.order_id}`,
+      vnp_IpAddr: "127.0.0.1",
+      vnp_OrderInfo: `${newOrder.order_id}`,
+      vnp_ReturnUrl,
+      vnp_CreateDate,
+      vnp_ExpireDate,
+    });
+
+    return { newOrder, vnpayUrl };
   });
 
-  const vnpay = new VNPay({
-    tmnCode: "0TSSC1QT",
-    secureSecret: "OTYGF8UKW9QVWWTE0BTY82Z1P3LOUA47",
-  });
-
-  const vnp_CreateDate = dateFormat(new Date());
-  const vnp_ExpireDate = dateFormat(
-    new Date(vnp_CreateDate.getDate() + 30 * 60 * 1000)
-  ); // 30 phút
-
-  const vnp_ReturnUrl = req.user
-    ? `http://localhost:8000/order/check-vnpay?userId=${req.user.user_id}`
-    : `http://localhost:8000/order/check-vnpay?sessionId=${req.sessionId}`;
-
-  const vnpayUrl = vnpay.buildPaymentUrl({
-    vnp_Amount: newOrder.order_total,
-    vnp_TxnRef: `${newOrder.order_id}`,
-    vnp_IpAddr: "127.0.0.1",
-    vnp_OrderInfo: `${newOrder.order_id}`,
-    vnp_ReturnUrl,
-    vnp_CreateDate,
-    vnp_ExpireDate,
-  });
-
-  return { newOrder, vnpayUrl };
+  return result;
 };
 
 module.exports = { createVnpayOrder };

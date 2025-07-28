@@ -13,7 +13,7 @@ router.post(
 router.post(
   "/get-order",
   protect,
-  authorize("admin"),
+  authorize("customer"),
   orderController.getOrder
 );
 
@@ -24,10 +24,6 @@ router.get(
   orderController.getOrderQuarterlyRevenue
 );
 
-router.get(
-  "/check-vnpay",
-  orderController.checkVNPay
-);
-
+router.get("/check-vnpay", orderController.checkVNPay);
 
 module.exports = router;

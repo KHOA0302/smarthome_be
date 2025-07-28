@@ -11,11 +11,13 @@ const paymentStrategies = {
   traditional: createTraditionalOrder,
   vnpay: createVnpayOrder,
 };
-
+const { VNPay } = require("vnpay");
 const { Order, Cart } = require("../models");
 
 const createOrder = async (req, res) => {
   const { cartId, method } = req.body;
+  const userId = req.user.user_id;
+  const sessionId = req.sessionId;
 
   try {
     const createOrderFunction = paymentStrategies[method];
@@ -24,7 +26,12 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ message: "Invalid payment method." });
     }
 
-    const result = await createOrderFunction({ cartId, method });
+    const result = await createOrderFunction({
+      cartId,
+      method,
+      userId,
+      sessionId,
+    });
 
     if (method === "traditional") {
       return res.status(201).json({
@@ -39,7 +46,11 @@ const createOrder = async (req, res) => {
         redirect: result.vnpayUrl,
       });
     }
-  } catch (error) {}
+  } catch (error) {
+    console.error("Create order controller error", error);
+
+    return res.status(500).json({ message: error.message});
+  }
 };
 
 const getOrder = async (req, res) => {
@@ -116,9 +127,8 @@ const getOrderQuarterlyRevenue = async (req, res) => {
 };
 
 const checkVNPay = async (req, res) => {
+  const { userId, sessionId, ...queryParams } = req.query;
   try {
-    const queryParams = req.query;
-
     const vnpay = new VNPay({
       tmnCode: "0TSSC1QT",
       secureSecret: "OTYGF8UKW9QVWWTE0BTY82Z1P3LOUA47",
@@ -127,16 +137,20 @@ const checkVNPay = async (req, res) => {
     const isValidSignature = vnpay.verifyReturnUrl(queryParams);
 
     if (!isValidSignature.isVerified || !isValidSignature.isSuccess) {
-      await Order.destroy({ where: { order_id: orderId } });
       return res.redirect(
         "https://your-frontend.com/payment-fail?error=invalid-signature"
       );
     }
 
-    const { vnp_TxnRef, vnp_ResponseCode, userId, sessionId } = queryParams;
+    const { vnp_TxnRef, vnp_ResponseCode } = queryParams;
     const orderId = vnp_TxnRef;
     if (vnp_ResponseCode === "00") {
       console.log("✅ Payment success:", vnp_TxnRef);
+
+      await Order.update(
+        { payment_status: "paid" },
+        { where: { order_id: orderId } }
+      );
 
       if (userId) {
         await Cart.destroy({ where: { user_id: userId } });
