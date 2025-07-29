@@ -1,8 +1,20 @@
 const express = require("express");
 const router = express.Router();
-
+const { protect, authorize } = require("../middleware/authMiddleware");
 const serviceController = require("../controllers/serviceController");
 
-router.post("/filter", serviceController.filterServices);
+router.post(
+  "/filter",
+  protect,
+  authorize("admin"),
+  serviceController.filterServices
+);
+
+router.post(
+  "/create-service",
+  protect,
+  authorize("admin"),
+  serviceController.createService
+);
 
 module.exports = router;

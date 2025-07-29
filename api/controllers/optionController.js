@@ -2,7 +2,6 @@ const db = require("../models");
 const Option = db.Option;
 const Sequelize = db.Sequelize; // Cần thiết cho các toán tử như Op.like
 
-
 const getAllOptions = async (req, res) => {
   // Lấy categoryId từ query parameter nếu có (ví dụ: /api/options?categoryId=1)
   const { categoryId } = req.query;
@@ -48,7 +47,6 @@ const getAllOptions = async (req, res) => {
   }
 };
 
-
 const getOptionById = async (req, res) => {
   const { id } = req.params; // Lấy option_id từ URL params
 
@@ -88,36 +86,24 @@ const getOptionById = async (req, res) => {
   }
 };
 
-
 const createOption = async (req, res) => {
-  const { option_name, is_filterable, category_id } = req.body;
+  const { categoryId, optionName, isFilterable } = req.body;
+
+  console.log(categoryId, optionName, isFilterable);
 
   try {
-    // Kiểm tra xem tên tùy chọn đã tồn tại trong cùng một danh mục chưa (tùy chọn)
-    const existingOption = await Option.findOne({
-      where: {
-        option_name: option_name,
-        category_id: category_id,
-      },
-    });
-    if (existingOption) {
-      return res
-        .status(409)
-        .json({ message: "Tên tùy chọn này đã tồn tại trong danh mục này." });
-    }
-
     // Kiểm tra category_id có tồn tại không
-    const categoryExists = await db.Category.findByPk(category_id);
+    const categoryExists = await db.Category.findByPk(categoryId);
     if (!categoryExists) {
       return res
         .status(400)
-        .json({ message: `Category với ID: ${category_id} không tồn tại.` });
+        .json({ message: `Category với ID: ${categoryId} không tồn tại.` });
     }
 
     const newOption = await Option.create({
-      option_name,
-      is_filterable: is_filterable !== undefined ? is_filterable : false, // Đảm bảo có giá trị mặc định
-      category_id,
+      option_name: optionName,
+      is_filterable: isFilterable,
+      category_id: categoryId,
     });
 
     res.status(201).json({
@@ -132,7 +118,6 @@ const createOption = async (req, res) => {
     });
   }
 };
-
 
 const updateOption = async (req, res) => {
   const { id } = req.params;
@@ -197,7 +182,6 @@ const updateOption = async (req, res) => {
   }
 };
 
-
 const deleteOption = async (req, res) => {
   const { id } = req.params;
 
@@ -229,9 +213,8 @@ const deleteOption = async (req, res) => {
   }
 };
 
-
 const filterOptions = async (req, res) => {
-  const { category_id, is_filterable } = req.body; 
+  const { category_id, is_filterable } = req.body;
 
   let whereClause = {};
 
@@ -287,5 +270,5 @@ module.exports = {
   createOption,
   updateOption,
   deleteOption,
-  filterOptions, 
+  filterOptions,
 };

@@ -31,6 +31,8 @@ const createOrder = async (req, res) => {
         redirect: "/order-success",
       });
     } else if (method === "vnpay") {
+      /////////////////////////////////////////////////////////////////////////////
+
       return res.status(201).json({
         message: "Order created successfully. Redirecting to payment gateway.",
         orderId: result.newOrder.order_id,

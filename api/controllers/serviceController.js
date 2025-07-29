@@ -79,33 +79,22 @@ const getServiceById = async (req, res) => {
   }
 };
 
-// Hàm để tạo một dịch vụ mới
 const createService = async (req, res) => {
-  const { service_name, description, category_id } = req.body;
+  const { categoryId, serviceName } = req.body;
 
   try {
-    // Kiểm tra xem tên dịch vụ đã tồn tại chưa
-    const existingService = await Service.findOne({
-      where: { service_name: service_name },
-    });
-    if (existingService) {
-      return res.status(409).json({ message: "Tên dịch vụ này đã tồn tại." });
-    }
-
-    // Kiểm tra category_id có tồn tại không nếu được cung cấp
-    if (category_id) {
-      const categoryExists = await db.Category.findByPk(category_id);
+    if (categoryId) {
+      const categoryExists = await db.Category.findByPk(categoryId);
       if (!categoryExists) {
         return res
           .status(400)
-          .json({ message: `Category với ID: ${category_id} không tồn tại.` });
+          .json({ message: `Category với ID: ${categoryId} không tồn tại.` });
       }
     }
 
     const newService = await Service.create({
-      service_name,
-      description,
-      category_id: category_id || null, // Lưu null nếu không có category_id
+      service_name: serviceName,
+      category_id: categoryId || null, // Lưu null nếu không có category_id
     });
 
     res.status(201).json({
