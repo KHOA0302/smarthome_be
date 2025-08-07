@@ -11,7 +11,7 @@ router.post(
 );
 
 router.post(
-  "/get-order",
+  "/get-order-admin",
   protect,
   authorize("admin"),
   orderController.getOrder

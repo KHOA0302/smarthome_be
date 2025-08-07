@@ -675,7 +675,7 @@ const getProductVariantDetails = async (req, res) => {
 };
 
 const getProductDetails = async (req, res) => {
-  const { productId } = req.body;
+  const { productId } = req.params;
 
   if (!productId) {
     return res.status(400).json({ message: "Product ID is required." });
@@ -749,27 +749,7 @@ const getProductDetails = async (req, res) => {
         {
           model: ProductSpecification,
           as: "specifications",
-          attributes: ["attribute_value"],
-          include: [
-            {
-              model: ProductAttribute,
-              as: "productAttribute",
-              attributes: [
-                "attribute_id",
-                "attribute_name",
-                "unit",
-                "display_order",
-                "is_filterable",
-              ],
-              include: [
-                {
-                  model: AttributeGroup,
-                  as: "attributegroups",
-                  attributes: ["group_id", "group_name", "display_order"],
-                },
-              ],
-            },
-          ],
+          attributes: ["specification_id", "attribute_value", "attribute_id"], // Đã thêm "attribute_id"
         },
       ],
       attributes: { exclude: ["created_at", "updated_at"] },
@@ -823,48 +803,85 @@ const getProductDetails = async (req, res) => {
       });
     }
 
-    // Nhóm các thông số kỹ thuật theo group và attribute
+    // --- BƯỚC 3: XỬ LÝ THÔNG SỐ KỸ THUẬT THEO LOGIC MỚI ---
+    // Truy vấn tất cả AttributeGroup và ProductAttribute của category
+    const attributeGroupsData = await AttributeGroup.findAll({
+      where: { category_id: product.category_id },
+      include: {
+        model: ProductAttribute,
+        as: "productattributes",
+        attributes: [
+          "attribute_id",
+          "attribute_name",
+          "unit",
+          "display_order",
+          "is_filterable",
+        ],
+      },
+      order: [
+        ["display_order", "ASC"],
+        [
+          { model: ProductAttribute, as: "productattributes" },
+          "display_order",
+          "ASC",
+        ],
+      ],
+    });
+
+    // Tạo cấu trúc cơ sở groupedSpecifications
     const groupedSpecifications = {};
+    attributeGroupsData.forEach((group) => {
+      const groupJson = group.toJSON();
+      groupedSpecifications[group.group_id] = {
+        groupId: groupJson.group_id,
+        groupName: groupJson.group_name,
+        groupDisplayOrder: groupJson.display_order,
+        attributes: {},
+      };
+
+      groupJson.productattributes.forEach((attr) => {
+        groupedSpecifications[group.group_id].attributes[attr.attribute_id] = {
+          attributeId: attr.attribute_id,
+          attributeName: attr.attribute_name,
+          displayOrder: attr.display_order,
+          isFilterable: attr.is_filterable,
+          unit: attr.unit,
+          attributeValues: [], // Luôn tồn tại, ban đầu là mảng rỗng
+        };
+      });
+    });
+
+    // Điền giá trị từ product.specifications (nếu có)
     if (product.specifications && product.specifications.length > 0) {
       product.specifications.forEach((spec) => {
-        const group = spec.productAttribute.attributegroups;
-        const attribute = spec.productAttribute;
+        // Tìm thuộc tính tương ứng và thêm giá trị
+        // Sử dụng try-catch để phòng trường hợp dữ liệu không khớp
+        try {
+          const attribute = Object.values(groupedSpecifications)
+            .flatMap((group) => Object.values(group.attributes))
+            .find((attr) => attr.attributeId === spec.attribute_id);
 
-        if (!groupedSpecifications[group.group_id]) {
-          groupedSpecifications[group.group_id] = {
-            groupId: group.group_id,
-            groupName: group.group_name,
-            groupDisplayOrder: group.display_order,
-            attributes: {},
-          };
+          if (attribute) {
+            attribute.attributeValues.push({
+              attributeValueId: spec.specification_id,
+              attributeValueName: spec.attribute_value,
+            });
+          }
+        } catch (error) {
+          console.warn(
+            `Could not map specification with attribute_id: ${spec.attribute_id}`
+          );
         }
-
-        const attributeGroup = groupedSpecifications[group.group_id];
-        if (!attributeGroup.attributes[attribute.attribute_id]) {
-          attributeGroup.attributes[attribute.attribute_id] = {
-            attributeId: attribute.attribute_id,
-            attributeName: attribute.attribute_name,
-            displayOrder: attribute.display_order,
-            isFilterable: attribute.is_filterable,
-            attributeValues: [],
-          };
-        }
-
-        attributeGroup.attributes[attribute.attribute_id].attributeValues.push(
-          spec.attribute_value
-        );
       });
     }
 
-    // Chuyển các object thành mảng và sắp xếp
-    const finalSpecifications = Object.values(groupedSpecifications)
-      .map((group) => {
-        group.attributes = Object.values(group.attributes).sort(
-          (a, b) => a.displayOrder - b.displayOrder
-        );
+    // Chuyển đối tượng thành mảng và sắp xếp để trả về frontend
+    const finalSpecifications = Object.values(groupedSpecifications).map(
+      (group) => {
+        group.attributes = Object.values(group.attributes);
         return group;
-      })
-      .sort((a, b) => a.groupDisplayOrder - b.groupDisplayOrder);
+      }
+    );
 
     delete product.variants;
     delete product.specifications;
@@ -1067,6 +1084,302 @@ const editVariants = async (req, res) => {
   }
 };
 
+const editService = async (req, res) => {
+  const { servicePackages } = req.body;
+
+  if (!servicePackages || !Array.isArray(servicePackages)) {
+    return res.status(400).json({ message: "Dữ liệu không hợp lệ." });
+  }
+
+  try {
+    await sequelize.transaction(async (t) => {
+      // --- GIAI ĐOẠN 1: XỬ LÝ CÁC GÓI DỊCH VỤ ĐÃ TỒN TẠI (CẬP NHẬT & XÓA) ---
+      for (const pkg of servicePackages) {
+        if (typeof pkg.packageId === "number") {
+          if (pkg.isRemove) {
+            // Xóa tất cả dịch vụ con trước
+            await PackageServiceItem.destroy({
+              where: { package_id: pkg.packageId },
+              transaction: t,
+            });
+            // Sau đó, xóa gói dịch vụ
+            await ServicePackage.destroy({
+              where: { package_id: pkg.packageId },
+              transaction: t,
+            });
+          } else {
+            // Cập nhật thông tin gói dịch vụ
+            await ServicePackage.update(
+              {
+                package_name: pkg.packageName,
+                description: pkg.description,
+                display_order: pkg.displayOrder,
+              },
+              {
+                where: { package_id: pkg.packageId },
+                transaction: t,
+              }
+            );
+
+            // Xử lý các dịch vụ con bên trong
+            for (const item of pkg.items) {
+              const cleanedPrice = parseFloat(
+                String(item.itemPriceImpact).replace(/\./g, "")
+              );
+              if (typeof item.itemId === "number") {
+                if (item.isRemove) {
+                  // Xóa dịch vụ con cụ thể
+                  await PackageServiceItem.destroy({
+                    where: { package_service_item_id: item.itemId },
+                    transaction: t,
+                  });
+                } else {
+                  // Cập nhật thông tin dịch vụ con
+                  await PackageServiceItem.update(
+                    {
+                      item_price_impact: cleanedPrice,
+                      selectable: item.selectable,
+                      at_least_one: item.atLeastOne,
+                    },
+                    {
+                      where: { package_service_item_id: item.itemId },
+                      transaction: t,
+                    }
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // --- GIAI ĐOẠN 2: XỬ LÝ CÁC GÓI DỊCH VỤ VÀ DỊCH VỤ CON MỚI (TẠO MỚI) ---
+      for (const pkg of servicePackages) {
+        if (typeof pkg.packageId === "string") {
+          if (!pkg.isRemove) {
+            const newPackage = await ServicePackage.create(
+              {
+                variant_id: pkg.variant_id,
+                package_name: pkg.packageName,
+                description: pkg.description,
+                display_order: pkg.displayOrder,
+              },
+              { transaction: t }
+            );
+
+            for (const item of pkg.items) {
+              const cleanedPrice = parseFloat(
+                String(item.itemPriceImpact).replace(/\./g, "")
+              );
+              if (!item.isRemove) {
+                await PackageServiceItem.create(
+                  {
+                    package_id: newPackage.package_id,
+                    service_id: item.serviceId,
+                    item_price_impact: cleanedPrice,
+                    at_least_one: item.atLeastOne,
+                    selectable: item.selectable,
+                  },
+                  { transaction: t }
+                );
+              }
+            }
+          }
+        } else if (typeof pkg.packageId === "number" && !pkg.isRemove) {
+          // Xử lý các dịch vụ con mới cho gói dịch vụ đã tồn tại
+          for (const item of pkg.items) {
+            if (typeof item.itemId === "string") {
+              if (!item.isRemove) {
+                await PackageServiceItem.create(
+                  {
+                    package_id: pkg.packageId,
+                    service_id: item.serviceId,
+                    item_price_impact: item.itemPriceImpact,
+                    at_least_one: item.atLeastOne,
+                    selectable: item.selectable,
+                  },
+                  { transaction: t }
+                );
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return res.status(200).json({ message: "Cập nhật dịch vụ thành công." });
+  } catch (error) {
+    console.error("Lỗi khi cập nhật dịch vụ:", error);
+    return res.status(500).json({
+      message: "Đã xảy ra lỗi khi cập nhật dịch vụ.",
+      error: error.message,
+    });
+  }
+};
+
+const editSpecifications = async (req, res) => {
+  const { productId, attributeGroups } = req.body;
+
+  if (!productId || !attributeGroups) {
+    return res
+      .status(400)
+      .json({ message: "Product ID and attribute groups are required." });
+  }
+
+  try {
+    await sequelize.transaction(async (t) => {
+      // Lặp qua từng nhóm thuộc tính (AttributeGroup)
+      for (const group of attributeGroups) {
+        // Lặp qua từng thuộc tính con (ProductAttribute)
+        for (const attribute of group.attributes) {
+          // Lặp qua từng giá trị thuộc tính (ProductSpecification)
+          for (const value of attribute.attributeValues) {
+            // Trường hợp 1: Xóa một thông số kỹ thuật đã tồn tại
+            if (value.isRemove) {
+              if (typeof value.attributeValueId === "number") {
+                await ProductSpecification.destroy({
+                  where: { specification_id: value.attributeValueId },
+                  transaction: t,
+                });
+              }
+              // Nếu là chuỗi (bản ghi mới), chỉ cần bỏ qua
+            }
+            // Trường hợp 2: Cập nhật hoặc thêm mới thông số kỹ thuật
+            else {
+              // Cập nhật thông số kỹ thuật đã tồn tại
+              if (typeof value.attributeValueId === "number") {
+                await ProductSpecification.update(
+                  {
+                    attribute_value: value.attributeValueName,
+                  },
+                  {
+                    where: {
+                      specification_id: value.attributeValueId,
+                    },
+                    transaction: t,
+                  }
+                );
+              }
+              // Thêm mới thông số kỹ thuật
+              else if (
+                typeof value.attributeValueId === "string" &&
+                value.attributeValueName.trim() !== ""
+              ) {
+                await ProductSpecification.create(
+                  {
+                    product_id: productId,
+                    attribute_id: attribute.attributeId,
+                    attribute_value: value.attributeValueName,
+                  },
+                  { transaction: t }
+                );
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return res
+      .status(200)
+      .json({ message: "Product specifications updated successfully." });
+  } catch (error) {
+    console.error("Error updating specifications:", error);
+    return res.status(500).json({
+      message: "An error occurred while updating product specifications.",
+      error: error.message,
+    });
+  }
+};
+
+const getTopSaleVariants = async (req, res) => {
+  const { limit } = req.params;
+
+  try {
+    const topVariants = await ProductVariant.findAll({
+      attributes: [
+        "variant_id",
+        "variant_sku",
+        "variant_name",
+        "price",
+        "stock_quantity",
+        "image_url",
+      ],
+
+      include: [
+        {
+          model: Product,
+          as: "product",
+          attributes: ["product_id", "sale_volume"],
+        },
+      ],
+      order: [[{ model: Product, as: "product" }, "sale_volume", "DESC"]],
+
+      limit: parseInt(limit, 10),
+    });
+
+    res.status(200).json(topVariants);
+  } catch (error) {
+    console.error("Lỗi khi lấy các variant bán chạy:", error);
+    res.status(500).json({ error: "Đã xảy ra lỗi khi lấy dữ liệu." });
+  }
+};
+
+const getLatestProducts = async (req, res) => {
+  const { limit } = req.params;
+
+  try {
+    // Bước 1: Tìm 5 Product mới nhất dựa trên created_at
+    const latestProducts = await Product.findAll({
+      attributes: ["product_id", "sale_volume", "created_at"],
+      order: [["created_at", "DESC"]],
+      limit: parseInt(limit, 10),
+      raw: true, // Lấy kết quả dưới dạng JSON thuần
+    });
+
+    // Bước 2: Với mỗi Product mới nhất, tìm Variant mới nhất của nó
+    const latestVariantsPromises = latestProducts.map(async (product) => {
+      const latestVariant = await ProductVariant.findOne({
+        where: { product_id: product.product_id },
+        attributes: [
+          "variant_id",
+          "variant_sku",
+          "variant_name",
+          "price",
+          "stock_quantity",
+          "image_url",
+          "created_at",
+        ],
+        order: [["created_at", "DESC"]],
+        raw: true, // Lấy kết quả dưới dạng JSON thuần
+      });
+
+      if (latestVariant) {
+        // Bước 3: Tạo đối tượng theo cấu trúc bạn mong muốn
+        return {
+          ...latestVariant,
+          product: {
+            product_id: product.product_id,
+            sale_volume: product.sale_volume,
+            created_at: product.created_at,
+          },
+        };
+      }
+      return null;
+    });
+
+    const results = await Promise.all(latestVariantsPromises);
+
+    // Lọc bỏ các giá trị null nếu có sản phẩm không có biến thể
+    const finalResult = results.filter((item) => item !== null);
+
+    res.status(200).json(finalResult);
+  } catch (error) {
+    console.error("Lỗi khi lấy sản phẩm và biến thể mới nhất:", error);
+    res.status(500).json({ error: "Đã xảy ra lỗi khi lấy dữ liệu." });
+  }
+};
+
 module.exports = {
   createProductWithDetails,
   getProductVariantDetails,
@@ -1074,4 +1387,8 @@ module.exports = {
   getAllProducts,
   editProductImgs,
   editVariants,
+  editService,
+  editSpecifications,
+  getTopSaleVariants,
+  getLatestProducts,
 };

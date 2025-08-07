@@ -11,4 +11,18 @@ router.post(
   cartController.createCartItem
 );
 
+router.put(
+  "/decrease-cart-item",
+  identifyUserOrGuest,
+  cartController.decreaseItem
+);
+
+router.put(
+  "/increase-cart-item",
+  identifyUserOrGuest,
+  cartController.increaseItem
+);
+
+router.put("/delete-cart-item", identifyUserOrGuest, cartController.deleteItem);
+
 module.exports = router;

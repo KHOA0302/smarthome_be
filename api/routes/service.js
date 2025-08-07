@@ -17,4 +17,11 @@ router.post(
   serviceController.createService
 );
 
+router.put(
+  "/update",
+  protect,
+  authorize("admin"),
+  serviceController.updateService
+);
+
 module.exports = router;

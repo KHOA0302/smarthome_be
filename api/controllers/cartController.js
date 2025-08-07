@@ -321,7 +321,124 @@ const createCartItem = async (req, res) => {
   }
 };
 
+const decreaseItem = async (req, res) => {
+  const { cartItemId } = req.body;
+
+  try {
+    const cartItem = await db.CartItem.findByPk(cartItemId);
+
+    if (!cartItem) {
+      return res.status(404).send({ message: "Không tìm thấy CartItem!" });
+    }
+
+    cartItem.quantity -= 1;
+    await cartItem.save();
+    return res.status(200).send(cartItem);
+  } catch (error) {
+    return res.status(500).send({
+      message: "Đã xảy ra lỗi khi giảm số lượng CartItem.",
+      error: error.message,
+    });
+  }
+};
+
+const increaseItem = async (req, res) => {
+  const { cartItemId } = req.body;
+  let cartIdentifier;
+
+  if (req.isGuest) {
+    cartIdentifier = { session_id: req.sessionId };
+  } else {
+    cartIdentifier = { user_id: req.user.id };
+  }
+
+  try {
+    const cartItemToUpdate = await db.CartItem.findByPk(cartItemId, {
+      include: [
+        {
+          model: db.Cart,
+          as: "cart",
+          where: cartIdentifier,
+        },
+        {
+          model: db.ProductVariant,
+          as: "productVariant",
+          attributes: ["stock_quantity"],
+        },
+      ],
+    });
+
+    if (!cartItemToUpdate) {
+      return res.status(404).send({
+        message: "Không tìm thấy CartItem hoặc không thuộc giỏ hàng của bạn.",
+      });
+    }
+
+    const { variant_id, productVariant } = cartItemToUpdate;
+    const stockQuantity = productVariant.stock_quantity;
+    const totalQuantity = await db.CartItem.sum("quantity", {
+      where: {
+        cart_id: cartItemToUpdate.cart_id,
+        variant_id: variant_id,
+      },
+    });
+
+    console.log(totalQuantity, ">", stockQuantity);
+
+    if (totalQuantity + 1 > stockQuantity) {
+      console.log("vẫn lỗi");
+      return res.status(400).send({
+        message: `Số lượng sản phẩm vượt quá tồn kho. Tồn kho hiện tại: ${stockQuantity}`,
+      });
+    }
+
+    cartItemToUpdate.quantity += 1;
+    await cartItemToUpdate.save();
+
+    return res.status(200).send(cartItemToUpdate);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send({
+      message: "Đã xảy ra lỗi khi tăng số lượng CartItem.",
+      error: error.message,
+    });
+  }
+};
+
+const deleteItem = async (req, res) => {
+  const { cartItemId } = req.body;
+  console.log(cartItemId);
+
+  if (!cartItemId) {
+    return res.status(400).send({ message: "cartItemId is required." });
+  }
+
+  try {
+    await db.CartItemService.destroy({
+      where: { cart_item_id: cartItemId },
+    });
+
+    const result = await db.CartItem.destroy({
+      where: { cart_item_id: cartItemId },
+    });
+
+    if (result === 0) {
+      return res.status(404).send({ message: "CartItem not found." });
+    }
+
+    return res.status(200).send({
+      message: "successfully.",
+    });
+  } catch (error) {
+    console.error("Error deleting cart item:", error);
+    return res.status(500).send({ message: "Internal server error." });
+  }
+};
+
 module.exports = {
   createCartItem,
   getCartItem,
+  decreaseItem,
+  increaseItem,
+  deleteItem,
 };

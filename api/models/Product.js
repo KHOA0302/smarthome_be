@@ -19,7 +19,10 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.INTEGER,
         allowNull: false,
       },
-
+      sale_volume: {
+        type: Sequelize.INTEGER,
+        defaultValue: 0,
+      },
       is_active: {
         type: Sequelize.BOOLEAN,
         allowNull: false,
@@ -31,7 +34,7 @@ module.exports = (sequelize, Sequelize) => {
         allowNull: false,
         defaultValue: Sequelize.NOW,
       },
-      
+
       updated_at: {
         type: Sequelize.DATE,
         allowNull: false,

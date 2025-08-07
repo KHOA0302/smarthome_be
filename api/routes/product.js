@@ -15,8 +15,8 @@ router.get(
   productController.getProductVariantDetails
 );
 
-router.post(
-  "/details",
+router.get(
+  "/details/:productId",
   protect,
   authorize("admin"),
   productController.getProductDetails
@@ -42,5 +42,22 @@ router.post(
   authorize("admin"),
   productController.editVariants
 );
+
+router.put(
+  "/edit-service",
+  protect,
+  authorize("admin"),
+  productController.editService
+);
+
+router.put(
+  "/edit-specifications",
+  protect,
+  authorize("admin"),
+  productController.editSpecifications
+);
+
+router.get("/get-top-sale/:limit", productController.getTopSaleVariants);
+router.get("/get-latest-product/:limit", productController.getLatestProducts);
 
 module.exports = router;

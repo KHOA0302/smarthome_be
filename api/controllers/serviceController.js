@@ -110,65 +110,7 @@ const createService = async (req, res) => {
   }
 };
 
-// Hàm để cập nhật thông tin dịch vụ
-const updateService = async (req, res) => {
-  const { id } = req.params;
-  const { service_name, description, category_id } = req.body;
-
-  try {
-    const service = await Service.findByPk(id);
-
-    if (!service) {
-      return res
-        .status(404)
-        .json({ message: `Không tìm thấy dịch vụ với ID: ${id}.` });
-    }
-
-    // Kiểm tra tính duy nhất của tên dịch vụ nếu tên thay đổi
-    if (service_name && service_name !== service.service_name) {
-      const existingService = await Service.findOne({
-        where: {
-          service_name: service_name,
-          service_id: { [Sequelize.Op.ne]: id }, // Loại trừ chính nó
-        },
-      });
-      if (existingService) {
-        return res.status(409).json({ message: "Tên dịch vụ này đã tồn tại." });
-      }
-    }
-
-    // Kiểm tra category_id mới có tồn tại không nếu được cung cấp và khác cũ
-    if (category_id !== undefined && category_id !== service.category_id) {
-      if (category_id !== null) {
-        // Nếu category_id không phải là null
-        const categoryExists = await db.Category.findByPk(category_id);
-        if (!categoryExists) {
-          return res.status(400).json({
-            message: `Category với ID: ${category_id} không tồn tại.`,
-          });
-        }
-      }
-    }
-
-    service.service_name = service_name || service.service_name;
-    service.description = description || service.description;
-    service.category_id =
-      category_id !== undefined ? category_id : service.category_id; // Cập nhật cả null
-
-    await service.save();
-
-    res.status(200).json({
-      message: `Cập nhật dịch vụ với ID ${id} thành công.`,
-      data: service,
-    });
-  } catch (error) {
-    console.error(`Lỗi khi cập nhật dịch vụ với ID ${id}:`, error);
-    res.status(500).json({
-      message: "Lỗi máy chủ nội bộ khi cập nhật dịch vụ.",
-      error: error.message,
-    });
-  }
-};
+const updateService = async (req, res) => {};
 
 // Hàm để xóa một dịch vụ
 const deleteService = async (req, res) => {
@@ -204,7 +146,7 @@ const deleteService = async (req, res) => {
 
 // Hàm controller để lọc các dịch vụ (sử dụng POST)
 const filterServices = async (req, res) => {
-  const { category_id, service_name_keyword } = req.body; // Lấy các tiêu chí lọc từ request body
+  const { category_id } = req.body; // Lấy các tiêu chí lọc từ request body
 
   let whereClause = {};
 
@@ -256,5 +198,5 @@ module.exports = {
   createService,
   updateService,
   deleteService,
-  filterServices, // Export hàm lọc
+  filterServices,
 };
