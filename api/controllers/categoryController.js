@@ -144,10 +144,6 @@ const deleteCategory = async (req, res) => {
         .json({ message: `Không tìm thấy danh mục với ID: ${id}.` });
     }
 
-    // Cân nhắc xử lý các sản phẩm thuộc danh mục này trước khi xóa
-    // Ví dụ: set category_id của các sản phẩm về null hoặc xóa sản phẩm liên quan.
-    // Tùy thuộc vào business logic của bạn.
-
     await category.destroy();
 
     res.status(200).json({

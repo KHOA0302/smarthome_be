@@ -11,55 +11,6 @@ const Sequelize = db.Sequelize;
  
  */
 
-const getOrdersByStatus = async (orderStatus) => {
-  const validStatuses = [
-    "pending",
-    "approved",
-    "cancel",
-    "shipping",
-    "delivered",
-  ];
-  if (!orderStatus || !validStatuses.includes(orderStatus.toLowerCase())) {
-    throw new Error("Invalid order status provided.");
-  }
-
-  try {
-    const orders = await db.Order.findAll({
-      where: {
-        order_status: orderStatus.toLowerCase(),
-      },
-      include: [
-        {
-          model: db.User,
-          as: "user",
-          attributes: ["user_id", "full_name", "email"],
-        },
-        {
-          model: db.OrderItem,
-          as: "orderItems",
-          include: [
-            {
-              model: db.ProductVariant,
-              as: "productVariant",
-              attributes: ["variant_name", "price"],
-            },
-            {
-              model: db.OrderItemService,
-              as: "orderItemServices",
-            },
-          ],
-        },
-      ],
-      order: [["created_at", "DESC"]],
-    });
-
-    return orders;
-  } catch (error) {
-    console.error("Error fetching orders by status:", error);
-    throw new Error("Failed to fetch orders by status.");
-  }
-};
-
 const getQuarterlyCategorySales = (orders, quarters) => {
   const quarterlyCategorySales = {}; // Stores category sales per quarter
   const totalQuantitySoldPerQuarter = {}; // Stores total quantity sold for each quarter
@@ -344,6 +295,5 @@ const getRevenueByYearAndQuarter = async (startYear, endYear) => {
 };
 
 module.exports = {
-  getOrdersByStatus,
   getRevenueByYearAndQuarter,
 };

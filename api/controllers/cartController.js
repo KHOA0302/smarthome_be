@@ -25,6 +25,8 @@ const getCartItem = async (req, res) => {
         .json({ message: "Không tìm thấy thông tin giỏ hàng." });
     }
 
+    console.log(cartIdentifier);
+
     const cart = await Cart.findOne({
       where: cartIdentifier,
       include: [
@@ -75,11 +77,9 @@ const getCartItem = async (req, res) => {
         .json({ message: "Giỏ hàng trống.", cartItems: [] });
     }
 
-    // 2. Định dạng lại payload
     const cartItemsPayload = cart.cartItems.map((cartItem) => {
       const productVariant = cartItem.productVariant;
 
-      // Xử lý options
       const optionsMap = new Map();
       if (
         productVariant.selectedOptionValues &&
@@ -101,7 +101,6 @@ const getCartItem = async (req, res) => {
       }
       const optionsPayload = [...optionsMap.values()];
 
-      // Xử lý services
       const servicesPayload = cartItem.cartItemServices.map(
         (cartItemService) => {
           const packageServiceItem = cartItemService.packageServiceItem;
@@ -109,12 +108,10 @@ const getCartItem = async (req, res) => {
             serviceId: packageServiceItem.serviceDefinition.service_id,
             serviceName: packageServiceItem.serviceDefinition.service_name,
             price: cartItemService.price,
-            // Có thể thêm các trường khác nếu cần
           };
         }
       );
 
-      // Tạo object cuối cùng
       return {
         cartItemId: cartItem.cart_item_id,
         variant: {
@@ -123,7 +120,6 @@ const getCartItem = async (req, res) => {
           variantName: productVariant.variant_name,
           price: productVariant.price,
           imageUrl: productVariant.image_url,
-          // ... thêm các thông tin variant khác nếu cần
         },
         options: optionsPayload,
         quantity: cartItem.quantity,
@@ -161,14 +157,12 @@ const createCartItem = async (req, res) => {
       cartIdentifier = { session_id: sessionId };
     }
 
-    // 1. Tìm hoặc tạo Cart
     const [cart] = await db.Cart.findOrCreate({
       where: cartIdentifier,
       defaults: cartIdentifier,
       transaction: t,
     });
 
-    // 2. Tìm ProductVariant để kiểm tra stockQuantity
     const productVariant = await db.ProductVariant.findByPk(variant.variantId, {
       transaction: t,
     });
@@ -178,8 +172,6 @@ const createCartItem = async (req, res) => {
       return res.status(404).json({ message: "Product variant not found." });
     }
 
-    // --- LOGIC KIỂM TRA TỒN KHO CẢI TIẾN ---
-    // Lấy TỔNG số lượng hiện có của variant này trong giỏ hàng
     const existingVariantItemsInCart = await db.CartItem.findAll({
       where: {
         cart_id: cart.cart_id,
@@ -210,9 +202,7 @@ const createCartItem = async (req, res) => {
           } sản phẩm có thể thêm.`,
       });
     }
-    // --- KẾT THÚC LOGIC KIỂM TRA TỒN KHO CẢI TIẾN ---
 
-    // 3. Tính toán tổng giá cho CartItem (bao gồm giá variant và giá service items)
     let cartItemPrice = parseFloat(variant.price);
     const selectedServiceItems =
       servicePackage && servicePackage.items
@@ -228,7 +218,6 @@ const createCartItem = async (req, res) => {
       cartItemPrice += parseFloat(item.itemPriceImpact);
     }
 
-    // 4. Kiểm tra và Tạo/Cập nhật CartItem
     let existingCartItem = null;
 
     const cartItemsInCurrentCart = await db.CartItem.findAll({
@@ -261,12 +250,8 @@ const createCartItem = async (req, res) => {
     let createdOrUpdatedCartItem;
 
     if (existingCartItem) {
-      // Nếu CartItem đã tồn tại và khớp với điều kiện duy nhất
-      // Tăng số lượng.
-      const newQuantity = existingCartItem.quantity + quantityToAdd; // Tăng thêm 1
+      const newQuantity = existingCartItem.quantity + quantityToAdd;
 
-      // **LƯU Ý:** Kiểm tra tồn kho tổng đã được thực hiện ở trên.
-      // Do đó, ở đây chỉ cần cập nhật số lượng.
       createdOrUpdatedCartItem = await existingCartItem.update(
         {
           quantity: newQuantity,
@@ -276,19 +261,17 @@ const createCartItem = async (req, res) => {
       );
       console.log("Updated CartItem:", createdOrUpdatedCartItem.toJSON());
     } else {
-      // Nếu không tìm thấy hoặc là CartItem mới
       createdOrUpdatedCartItem = await db.CartItem.create(
         {
           cart_id: cart.cart_id,
           variant_id: variant.variantId,
-          quantity: quantityToAdd, // Mặc định là 1 khi tạo mới
+          quantity: quantityToAdd,
           price: cartItemPrice,
         },
         { transaction: t }
       );
       console.log("Created new CartItem:", createdOrUpdatedCartItem.toJSON());
 
-      // 5. Lưu CartItemService nếu có các service items được chọn
       if (selectedServiceItems.length > 0) {
         const cartItemServicesToCreate = selectedServiceItems.map((item) => ({
           cart_item_id: createdOrUpdatedCartItem.cart_item_id,
@@ -407,7 +390,6 @@ const increaseItem = async (req, res) => {
 
 const deleteItem = async (req, res) => {
   const { cartItemId } = req.body;
-  console.log(cartItemId);
 
   if (!cartItemId) {
     return res.status(400).send({ message: "cartItemId is required." });

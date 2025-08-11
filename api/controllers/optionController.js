@@ -1,9 +1,7 @@
 const db = require("../models");
 const Option = db.Option;
-const Sequelize = db.Sequelize; // Cần thiết cho các toán tử như Op.like
-
+const Sequelize = db.Sequelize;
 const getAllOptions = async (req, res) => {
-  // Lấy categoryId từ query parameter nếu có (ví dụ: /api/options?categoryId=1)
   const { categoryId } = req.query;
   let whereClause = {};
 
@@ -16,18 +14,18 @@ const getAllOptions = async (req, res) => {
       where: whereClause,
       include: [
         {
-          model: db.Category, // Bao gồm thông tin Category liên quan
+          model: db.Category,
           as: "category",
-          attributes: ["category_id", "category_name"], // Chỉ lấy các trường cần thiết
+          attributes: ["category_id", "category_name"],
         },
         {
-          model: db.OptionValue, // Bao gồm các OptionValue liên quan đến mỗi Option
+          model: db.OptionValue,
           as: "optionValues",
           attributes: ["option_value_id", "option_value_name"],
-          order: [["option_value_name", "ASC"]], // Sắp xếp option values
+          order: [["option_value_name", "ASC"]],
         },
       ],
-      order: [["option_name", "ASC"]], // Sắp xếp các option
+      order: [["option_name", "ASC"]],
     });
 
     if (!options || options.length === 0) {
@@ -48,7 +46,7 @@ const getAllOptions = async (req, res) => {
 };
 
 const getOptionById = async (req, res) => {
-  const { id } = req.params; // Lấy option_id từ URL params
+  const { id } = req.params;
 
   try {
     const option = await Option.findByPk(id, {
@@ -92,7 +90,6 @@ const createOption = async (req, res) => {
   console.log(categoryId, optionName, isFilterable);
 
   try {
-    // Kiểm tra category_id có tồn tại không
     const categoryExists = await db.Category.findByPk(categoryId);
     if (!categoryExists) {
       return res
@@ -132,7 +129,6 @@ const updateOption = async (req, res) => {
         .json({ message: `Không tìm thấy tùy chọn với ID: ${id}.` });
     }
 
-    // Kiểm tra tính duy nhất của tên tùy chọn trong cùng danh mục nếu tên hoặc category_id thay đổi
     if (
       option_name &&
       (option_name !== option.option_name ||
@@ -141,8 +137,8 @@ const updateOption = async (req, res) => {
       const existingOption = await Option.findOne({
         where: {
           option_name: option_name,
-          category_id: category_id || option.category_id, // Sử dụng category_id mới hoặc cũ
-          option_id: { [Sequelize.Op.ne]: id }, // Loại trừ chính nó
+          category_id: category_id || option.category_id,
+          option_id: { [Sequelize.Op.ne]: id },
         },
       });
       if (existingOption) {
@@ -152,7 +148,6 @@ const updateOption = async (req, res) => {
       }
     }
 
-    // Kiểm tra category_id mới có tồn tại không nếu được cung cấp
     if (category_id && category_id !== option.category_id) {
       const categoryExists = await db.Category.findByPk(category_id);
       if (!categoryExists) {
@@ -193,11 +188,6 @@ const deleteOption = async (req, res) => {
         .status(404)
         .json({ message: `Không tìm thấy tùy chọn với ID: ${id}.` });
     }
-
-    // Cân nhắc xử lý các OptionValue liên quan trước khi xóa Option
-    // Ví dụ: Bạn có thể muốn xóa cascading các option values,
-    // hoặc ngăn không cho xóa nếu có option values liên quan
-    // hoặc đặt option_id của option values về null (nếu cho phép)
 
     await option.destroy();
 

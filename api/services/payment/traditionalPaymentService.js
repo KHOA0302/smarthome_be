@@ -32,6 +32,8 @@ const createTraditionalOrder = async (orderData) => {
       throw new Error("Cart not found.");
     }
 
+    console.log("Cart fetched:", JSON.stringify(cart, null, 2));
+
     // Gom nhóm số lượng và kiểm tra tồn kho (logic này vẫn giữ nguyên)
     const aggregatedQuantities = {};
     for (const cartItem of cart.cartItems) {
@@ -40,6 +42,8 @@ const createTraditionalOrder = async (orderData) => {
         (aggregatedQuantities[variant_id] || 0) + quantity;
     }
 
+    console.log("Aggregated Quantities:", aggregatedQuantities);
+
     const variantIds = Object.keys(aggregatedQuantities);
     const variants = await db.ProductVariant.findAll({
       where: { variant_id: variantIds },
@@ -47,10 +51,14 @@ const createTraditionalOrder = async (orderData) => {
       transaction: t,
     });
 
+    console.log("Variants with stock:", JSON.stringify(variants, null, 2));
+
     const outOfStockItems = variants.filter(
       (variant) =>
         variant.stock_quantity < aggregatedQuantities[variant.variant_id]
     );
+
+    console.log("Out of stock items:", outOfStockItems);
 
     if (outOfStockItems.length > 0) {
       const errorMsg = outOfStockItems
@@ -66,6 +74,15 @@ const createTraditionalOrder = async (orderData) => {
 
     // Cập nhật tồn kho
     for (const variant of variants) {
+      const oldStock = variant.stock_quantity;
+      const quantityToSubtract = aggregatedQuantities[variant.variant_id];
+      console.log(
+        `Updating stock for variant ${
+          variant.variant_id
+        }: Old=${oldStock}, Subtract=${quantityToSubtract}, New=${
+          oldStock - quantityToSubtract
+        }`
+      );
       variant.stock_quantity -= aggregatedQuantities[variant.variant_id];
       await variant.save({ transaction: t });
     }
@@ -106,6 +123,7 @@ const createTraditionalOrder = async (orderData) => {
     // =========================================================================
     //  PHẦN CẬP NHẬT: TẠO ORDER VỚI order_total
     // =========================================================================
+    console.log(orderData.guestInfo);
     const newOrder = await db.Order.create(
       {
         user_id: cart.user_id,

@@ -1,12 +1,10 @@
 const db = require("../models");
 const Brand = db.Brand;
 
-// Hàm để lấy tất cả các thương hiệu
 const getAllBrands = async (req, res) => {
   try {
     const brands = await Brand.findAll({
-      // attributes: ['brand_id', 'brand_name', 'logo_url'], // Chỉ lấy các trường cần thiết
-      order: [["brand_name", "ASC"]], // Sắp xếp theo tên thương hiệu tăng dần
+      order: [["brand_name", "ASC"]],
     });
 
     if (!brands || brands.length === 0) {
@@ -28,12 +26,11 @@ const getAllBrands = async (req, res) => {
   }
 };
 
-// Hàm để lấy một thương hiệu theo ID
 const getBrandById = async (req, res) => {
-  const { id } = req.params; // Lấy brand_id từ URL params
+  const { id } = req.params;
 
   try {
-    const brand = await Brand.findByPk(id); // Sử dụng findByPk để tìm theo khóa chính
+    const brand = await Brand.findByPk(id);
 
     if (!brand) {
       return res
@@ -54,7 +51,6 @@ const getBrandById = async (req, res) => {
   }
 };
 
-// Hàm để tạo một thương hiệu mới (ví dụ, chỉ dành cho Admin)
 const createBrand = async (req, res) => {
   const { brand_name, logo_url } = req.body;
 
@@ -90,7 +86,6 @@ const createBrand = async (req, res) => {
   }
 };
 
-// Hàm để cập nhật thông tin thương hiệu (ví dụ, chỉ dành cho Admin)
 const updateBrand = async (req, res) => {
   const { id } = req.params;
   const { brand_name, logo_url, description } = req.body;
@@ -104,7 +99,6 @@ const updateBrand = async (req, res) => {
         .json({ message: `Không tìm thấy thương hiệu với ID: ${id}.` });
     }
 
-    // Kiểm tra xem tên thương hiệu mới có trùng với tên thương hiệu khác không (nếu tên thay đổi)
     if (brand_name && brand_name !== brand.brand_name) {
       const existingBrand = await Brand.findOne({
         where: { brand_name: brand_name },
@@ -118,7 +112,7 @@ const updateBrand = async (req, res) => {
     brand.logo_url = logo_url || brand.logo_url;
     brand.description = description || brand.description;
 
-    await brand.save(); // Lưu các thay đổi vào database
+    await brand.save();
 
     res.status(200).json({
       message: `Cập nhật thương hiệu với ID ${id} thành công.`,
@@ -133,7 +127,6 @@ const updateBrand = async (req, res) => {
   }
 };
 
-// Hàm để xóa một thương hiệu (ví dụ, chỉ dành cho Admin)
 const deleteBrand = async (req, res) => {
   const { id } = req.params;
 
@@ -146,7 +139,7 @@ const deleteBrand = async (req, res) => {
         .json({ message: `Không tìm thấy thương hiệu với ID: ${id}.` });
     }
 
-    await brand.destroy(); // Xóa bản ghi khỏi database
+    await brand.destroy();
 
     res.status(200).json({
       message: `Xóa thương hiệu với ID ${id} thành công.`,

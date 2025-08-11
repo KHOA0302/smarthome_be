@@ -355,6 +355,16 @@ const getProductVariantDetails = async (req, res) => {
       attributes: ["product_id", "product_name"],
       include: [
         {
+          model: db.Brand,
+          as: "brand",
+          attributes: ["brand_id", "brand_name"],
+        },
+        {
+          model: db.Category,
+          as: "category",
+          attributes: ["category_id", "category_name"],
+        },
+        {
           model: db.ProductVariant,
           as: "variants",
           attributes: [
@@ -643,6 +653,19 @@ const getProductVariantDetails = async (req, res) => {
       base: {
         productId: productDetails.product_id,
         productName: productDetails.product_name,
+        brand: productDetails.brand
+          ? {
+              brandId: productDetails.brand.brand_id,
+              brandName: productDetails.brand.brand_name,
+              logoUrl: productDetails.brand.logo_url,
+            }
+          : null,
+        category: productDetails.category
+          ? {
+              categoryId: productDetails.category.category_id,
+              categoryName: productDetails.category.category_name,
+            }
+          : null,
         productImages: productDetails.product_images.map((img) => ({
           imgId: img.img_id,
           imageUrl: img.image_url,
@@ -1380,6 +1403,67 @@ const getLatestProducts = async (req, res) => {
   }
 };
 
+const getProductByfilter = async (req, res) => {
+  const { categoryId, brandId } = req.body;
+  console.log(req.body);
+  const page = parseInt(req.query.page) || 1;
+  const pageSize = parseInt(req.query.pageSize) || 10;
+
+  const offset = (page - 1) * pageSize;
+  const limit = pageSize;
+  const whereClause = {};
+
+  if (categoryId) {
+    whereClause.category_id = categoryId;
+  }
+
+  if (brandId) {
+    whereClause.brand_id = brandId;
+  }
+
+  try {
+    const { count, rows: products } = await Product.findAndCountAll({
+      where: whereClause,
+      include: [
+        { model: db.Category, as: "category" },
+        { model: db.Brand, as: "brand" },
+        { model: db.ProductVariant, as: "variants" },
+      ],
+      offset: offset,
+      limit: limit,
+      distinct: true,
+    });
+
+    const totalVariants = await db.ProductVariant.count({
+      include: [
+        {
+          model: db.Product,
+          as: "product",
+          where: whereClause,
+        },
+      ],
+      distinct: true,
+    });
+
+    if (!products || products.length === 0) {
+      return res.status(404).json({ message: "Không tìm thấy sản phẩm nào." });
+    }
+
+    const totalPages = Math.ceil(count / pageSize);
+
+    res.status(200).json({
+      totalProducts: count,
+      totalVariants: totalVariants,
+      products: products,
+      currentPage: page,
+      totalPages: totalPages,
+    });
+  } catch (error) {
+    console.error("Lỗi khi tìm kiếm sản phẩm:", error);
+    res.status(500).json({ message: "Đã xảy ra lỗi server." });
+  }
+};
+
 module.exports = {
   createProductWithDetails,
   getProductVariantDetails,
@@ -1391,4 +1475,5 @@ module.exports = {
   editSpecifications,
   getTopSaleVariants,
   getLatestProducts,
+  getProductByfilter,
 };

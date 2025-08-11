@@ -60,4 +60,6 @@ router.put(
 router.get("/get-top-sale/:limit", productController.getTopSaleVariants);
 router.get("/get-latest-product/:limit", productController.getLatestProducts);
 
+router.post("/get-product-by-filter", productController.getProductByfilter);
+
 module.exports = router;

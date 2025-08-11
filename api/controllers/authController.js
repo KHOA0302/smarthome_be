@@ -116,15 +116,12 @@ const handleLoginAttemp = async (req, res) => {
           }
         }
 
-        // 4. Nếu tồn kho đủ, thực hiện gộp giỏ hàng
         if (!userCart) {
-          // Trường hợp 1: User chưa có giỏ hàng. Chuyển giỏ hàng của khách.
           await guestCart.update(
             { user_id: user.user_id, session_id: null },
             { transaction: t }
           );
         } else {
-          // Trường hợp 2: User đã có giỏ hàng. Gộp giỏ hàng của khách vào của user.
           for (const guestItem of guestCart.cartItems) {
             const guestServiceItemsHash = guestItem.cartItemServices
               .map((s) => s.package_service_item_id)
@@ -160,8 +157,6 @@ const handleLoginAttemp = async (req, res) => {
             }
           }
 
-          // Bổ sung: Xóa thủ công tất cả cartItems của giỏ hàng khách
-          // trước khi xóa giỏ hàng đó
           if (guestCart.cartItems.length > 0) {
             await CartItem.destroy({
               where: { cart_id: guestCart.cart_id },
@@ -169,13 +164,10 @@ const handleLoginAttemp = async (req, res) => {
             });
           }
 
-          // Sau khi gộp và xóa items xong, xóa giỏ hàng cũ của khách
           await guestCart.destroy({ transaction: t });
         }
       }
     }
-    // --- KẾT THÚC LOGIC GỘP GIỎ HÀNG ---
-
     const payload = {
       user_id: user.user_id,
       username: user.email,
@@ -185,10 +177,8 @@ const handleLoginAttemp = async (req, res) => {
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
 
-    // Commit transaction chỉ khi tất cả các bước trên thành công
     await t.commit();
 
-    // Gửi phản hồi thành công cuối cùng
     res.status(200).json({
       message: "Đăng nhập thành công!",
       token: token,
@@ -202,7 +192,6 @@ const handleLoginAttemp = async (req, res) => {
     });
     console.log("Login success!!");
   } catch (err) {
-    // Luôn luôn rollback nếu có lỗi xảy ra
     await t.rollback();
     console.error("Lỗi đăng nhập:", err);
     res

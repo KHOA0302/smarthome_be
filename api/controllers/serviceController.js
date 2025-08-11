@@ -1,13 +1,9 @@
-// controllers/service.controller.js
-
-const db = require("../models"); // Đảm bảo đường dẫn đến models là chính xác
+const db = require("../models");
 const Service = db.Service;
-const Sequelize = db.Sequelize; // Cần thiết cho các toán tử như Op.like
-const Op = Sequelize.Op; // Import Op từ Sequelize
+const Sequelize = db.Sequelize;
+const Op = Sequelize.Op;
 
-// Hàm để lấy tất cả các dịch vụ (có thể có bộ lọc theo categoryId)
 const getAllServices = async (req, res) => {
-  // Lấy categoryId từ query parameter nếu có (ví dụ: /api/services?categoryId=1)
   const { categoryId } = req.query;
   let whereClause = {};
 
@@ -20,12 +16,12 @@ const getAllServices = async (req, res) => {
       where: whereClause,
       include: [
         {
-          model: db.Category, // Bao gồm thông tin Category liên quan
+          model: db.Category,
           as: "category",
-          attributes: ["category_id", "category_name"], // Chỉ lấy các trường cần thiết
+          attributes: ["category_id", "category_name"],
         },
       ],
-      order: [["service_name", "ASC"]], // Sắp xếp các dịch vụ theo tên
+      order: [["service_name", "ASC"]],
     });
 
     if (!services || services.length === 0) {
@@ -45,9 +41,8 @@ const getAllServices = async (req, res) => {
   }
 };
 
-// Hàm để lấy một dịch vụ theo ID
 const getServiceById = async (req, res) => {
-  const { id } = req.params; // Lấy service_id từ URL params
+  const { id } = req.params;
 
   try {
     const service = await Service.findByPk(id, {
@@ -94,7 +89,7 @@ const createService = async (req, res) => {
 
     const newService = await Service.create({
       service_name: serviceName,
-      category_id: categoryId || null, // Lưu null nếu không có category_id
+      category_id: categoryId || null,
     });
 
     res.status(201).json({
@@ -112,7 +107,6 @@ const createService = async (req, res) => {
 
 const updateService = async (req, res) => {};
 
-// Hàm để xóa một dịch vụ
 const deleteService = async (req, res) => {
   const { id } = req.params;
 
@@ -124,11 +118,6 @@ const deleteService = async (req, res) => {
         .status(404)
         .json({ message: `Không tìm thấy dịch vụ với ID: ${id}.` });
     }
-
-    // Cân nhắc xử lý các PackageServiceItem liên quan trước khi xóa Service
-    // Ví dụ: Bạn có thể muốn xóa cascading các PackageServiceItem,
-    // hoặc ngăn không cho xóa nếu có PackageServiceItem liên quan
-    // Tùy thuộc vào business logic của bạn.
 
     await service.destroy();
 
@@ -144,21 +133,14 @@ const deleteService = async (req, res) => {
   }
 };
 
-// Hàm controller để lọc các dịch vụ (sử dụng POST)
 const filterServices = async (req, res) => {
-  const { category_id } = req.body; // Lấy các tiêu chí lọc từ request body
+  const { category_id } = req.body;
 
   let whereClause = {};
 
   if (category_id !== undefined) {
-    // Cho phép lọc cả null category_id
     whereClause[Op.or] = [{ category_id: category_id }, { category_id: null }];
   }
-  //   if (service_name_keyword) {
-  //     whereClause.service_name = {
-  //       [Sequelize.Op.like]: `%${service_name_keyword}%`,
-  //     };
-  //   }
 
   try {
     const services = await Service.findAll({
