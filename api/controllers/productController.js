@@ -1,3 +1,5 @@
+const res = require("express/lib/response");
+const { Op } = require("sequelize");
 const db = require("../models");
 const {
   Product,
@@ -694,6 +696,100 @@ const getProductVariantDetails = async (req, res) => {
     res
       .status(500)
       .json({ message: "Internal server error", error: error.message });
+  }
+};
+
+const searchProductByName = async (req, res) => {
+  try {
+    const { name } = req.body; // hoặc req.query nếu GET
+
+    if (!name) {
+      return res.status(400).json({ message: "Tên sản phẩm là bắt buộc." });
+    }
+
+    const products = await Product.findAll({
+      where: {
+        product_name: { [Op.like]: `%${name}%` }
+      },
+      include: [
+        {
+          model: ProductVariant,
+          as: "variants",
+          attributes: ["variant_id", "price"], // ✅ lấy giá ở đây
+          limit: 1 // nếu bạn chỉ muốn 1 giá đại diện
+        }
+      ],
+      attributes: ["product_id", "product_name"], // ❌ bỏ 'price' vì không có
+    });
+
+    if (!products || products.length === 0) {
+      return res.status(404).json({ message: "Hiện không có sản phẩm." });
+    }
+
+    // Nếu bạn muốn trả về giá đại diện từ variant đầu tiên
+    const mappedProducts = products.map((p) => {
+      const json = p.toJSON();
+      return {
+        product_id: json.product_id,
+        product_name: json.product_name,
+        price: json.variants.length > 0 ? json.variants[0].price : null, // ✅
+      };
+    });
+
+    return res.status(200).json(mappedProducts);
+  } catch (error) {
+    console.error("Error searching product:", error);
+    return res.status(500).json({ message: "Lỗi khi tìm sản phẩm.", error: error.message });
+  }
+};
+
+
+const getProductShortDetails = async (req, res) => {
+  const { productId } = req.params;
+
+  if (!productId) {
+    return res.status(404).json({ message: "Product ID is required." });
+  }
+
+  try {
+    // Truy vấn chỉ lấy tên và giá
+    const productData = await Product.findOne({
+      where: { product_id: productId },
+      attributes: ["product_id", "product_name", "price"], // 👈 chỉ lấy tên và giá
+      // Nếu giá nằm ở bảng variant thì include 1 variant
+      include: [
+        {
+          model: ProductVariant,
+          as: "variants",
+          attributes: ["price"],
+          required: false, // vẫn trả về nếu không có variant
+        },
+      ],
+    });
+
+    if (!productData) {
+      return res.status(404).json({ message: "Product not found." });
+    }
+
+    const product = productData.toJSON();
+
+    // Ưu tiên giá từ Product, nếu không có thì lấy giá từ Variant
+    const price =
+      product.price ??
+      (product.variants && product.variants.length > 0
+        ? product.variants[0].price
+        : null);
+
+    return res.status(200).json({
+      name: product.product_name,
+      price: price,
+    });
+  } catch (error) {
+    console.error("Error fetching product details:", error);
+    return res.status(500).json({
+      message: "An error occurred while retrieving product details.",
+      error: error.message,
+    });
   }
 };
 
@@ -1476,4 +1572,7 @@ module.exports = {
   getTopSaleVariants,
   getLatestProducts,
   getProductByfilter,
+  getProductShortDetails,
+  searchProductByName,
+
 };

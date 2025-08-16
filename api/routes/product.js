@@ -18,9 +18,12 @@ router.get(
 router.get(
   "/details/:productId",
   protect,
-  authorize("admin"),
   productController.getProductDetails
 );
+
+router.post("/search", productController.searchProductByName);
+
+router.get("/short-details/:product", productController.getProductShortDetails);
 
 router.get(
   "/all",
