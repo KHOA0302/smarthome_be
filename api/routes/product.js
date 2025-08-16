@@ -22,14 +22,14 @@ router.get(
   productController.getProductDetails
 );
 
-router.get(
+router.post(
   "/all",
   protect,
   authorize("admin"),
-  productController.getAllProducts
+  productController.getAllProductsByFilter
 );
 
-router.post(
+router.put(
   "/edit-imgs",
   protect,
   authorize("admin"),
@@ -57,9 +57,17 @@ router.put(
   productController.editSpecifications
 );
 
+router.put(
+  "/edit-product-info",
+  protect,
+  authorize("admin"),
+  productController.editProductBasicInfo
+);
+
+router.get("/search", productController.searchTopProducts);
+
 router.get("/get-top-sale/:limit", productController.getTopSaleVariants);
 router.get("/get-latest-product/:limit", productController.getLatestProducts);
-
-router.post("/get-product-by-filter", productController.getProductByfilter);
+router.post("/get-product-by-filter", productController.getPageProductByfilter);
 
 module.exports = router;

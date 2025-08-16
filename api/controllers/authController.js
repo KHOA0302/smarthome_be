@@ -9,6 +9,7 @@ const Cart = db.Cart;
 const CartItem = db.CartItem;
 const CartItemService = db.CartItemService;
 const ProductVariant = db.ProductVariant;
+const { Op } = db.Sequelize;
 
 const handleLoginAttemp = async (req, res) => {
   const { password, username } = req.body;
@@ -42,7 +43,6 @@ const handleLoginAttemp = async (req, res) => {
       return res.status(400).json({ message: "Mật khẩu không đúng." });
     }
 
-    // --- LOGIC GỘP GIỎ HÀNG VÀ KIỂM TRA TỒN KHO PHỨC TẠP ---
     if (sessionId) {
       const guestCart = await Cart.findOne({
         where: { session_id: sessionId },
@@ -69,7 +69,6 @@ const handleLoginAttemp = async (req, res) => {
           transaction: t,
         });
 
-        // 1. Tính tổng số lượng của từng variant_id từ cả hai giỏ hàng
         const combinedQuantity = new Map();
         const processItems = (items) => {
           if (items && items.length > 0) {
@@ -87,7 +86,6 @@ const handleLoginAttemp = async (req, res) => {
         processItems(userCart ? userCart.cartItems : []);
         processItems(guestCart.cartItems);
 
-        // 2. Lấy tất cả ProductVariant để kiểm tra tồn kho
         const allVariantIds = [...combinedQuantity.keys()];
         const productVariants = await ProductVariant.findAll({
           where: { variant_id: allVariantIds },
@@ -97,7 +95,6 @@ const handleLoginAttemp = async (req, res) => {
           productVariants.map((pv) => [pv.variant_id, pv])
         );
 
-        // 3. Kiểm tra tồn kho trước khi gộp
         for (const [variantId, totalQuantity] of combinedQuantity.entries()) {
           const variant = productVariantMap.get(variantId);
 
@@ -265,7 +262,7 @@ const handleGoogle = async (req, res) => {
     });
 
     const payload = ticket.getPayload();
-    console.log("Google Payload:", payload);
+
     const googleUserId = payload["sub"];
     const email = payload["email"];
     const fullName = payload["name"];
@@ -371,14 +368,6 @@ const getUserInfo = async (req, res) => {
   try {
     const user = await User.findOne({
       where: { user_id: req.user.id },
-      attributes: [
-        "full_name",
-        "phone_number",
-        "province",
-        "district",
-        "house_number",
-        "is_profile_complete",
-      ],
     });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -401,9 +390,66 @@ const generateAuthToken = (user) => {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
 };
 
+const editUserInfo = async (req, res) => {
+  const { userEdited } = req.body;
+  const userId = userEdited.id;
+  const googleId = userEdited.google_sub_id;
+
+  try {
+    const isProfileComplete =
+      userEdited.name &&
+      userEdited.phoneNumber &&
+      userEdited.province &&
+      userEdited.district &&
+      userEdited.houseNumber
+        ? 1
+        : 0;
+    const userUpdateData = {
+      full_name: userEdited.name,
+      phone_number: userEdited.phoneNumber,
+      province: userEdited.province,
+      district: userEdited.district,
+      house_number: userEdited.houseNumber,
+      is_profile_complete: isProfileComplete,
+    };
+
+    const updateConditions = [];
+
+    if (userId) {
+      updateConditions.push({ user_id: userId });
+    }
+
+    if (googleId) {
+      updateConditions.push({ google_sub_id: googleId });
+    }
+
+    const [rowsUpdated] = await User.update(userUpdateData, {
+      where: {
+        [Op.or]: updateConditions,
+      },
+    });
+
+    if (rowsUpdated > 0) {
+      res.status(200).send({
+        message: "Thông tin người dùng đã được cập nhật thành công.",
+      });
+    } else {
+      res.status(404).send({
+        message: `Không tìm thấy người dùng.`,
+      });
+    }
+  } catch (error) {
+    res.status(500).send({
+      message: "Lỗi khi cập nhật thông tin người dùng.",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   handleLoginAttemp,
   handleRegister,
   handleGoogle,
   getUserInfo,
+  editUserInfo,
 };

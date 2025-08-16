@@ -33,4 +33,5 @@ router.put(
   orderController.editOrderStatus
 );
 
+router.get("/check-vnpay", identifyUserOrGuest, orderController.checkVNPay);
 module.exports = router;

@@ -19,6 +19,8 @@ const {
   Sequelize,
   sequelize,
 } = db;
+const { Op } = db.Sequelize;
+const { deleteImageFromFirebase } = require("../utils/firebase");
 
 const createProductWithDetails = async (req, res) => {
   const { basic, options, variants, services, attributes } = req.body;
@@ -28,7 +30,7 @@ const createProductWithDetails = async (req, res) => {
   try {
     transaction = await db.sequelize.transaction();
 
-    // --- BƯỚC 1: XÁC THỰC DỮ LIỆU CƠ BẢN VÀ KIỂM TRA KHÓA NGOẠI ---
+   
     if (!basic || !basic.name || basic.name.trim() === "") {
       throw new Error("Tên sản phẩm (basic.name) không được để trống.");
     }
@@ -39,7 +41,7 @@ const createProductWithDetails = async (req, res) => {
       throw new Error("ID danh mục (basic.category) không được để trống.");
     }
 
-    // Kiểm tra sự tồn tại của Brand và Category
+    
     const existingBrand = await Brand.findByPk(basic.brand, { transaction });
     if (!existingBrand) {
       throw new Error(`Thương hiệu với ID ${basic.brand} không tồn tại.`);
@@ -52,7 +54,7 @@ const createProductWithDetails = async (req, res) => {
       throw new Error(`Danh mục với ID ${basic.category} không tồn tại.`);
     }
 
-    // --- BƯỚC 2: TẠO PRODUCT CHÍNH ---
+   
     const newProduct = await Product.create(
       {
         product_name: basic.name.trim(),
@@ -65,18 +67,18 @@ const createProductWithDetails = async (req, res) => {
 
     const productId = newProduct.product_id;
 
-    // --- BƯỚC 3: LƯU TRỮ HÌNH ẢNH VÀO BẢNG ProductImages ---
+    
     if (basic.imgs && Array.isArray(basic.imgs) && basic.imgs.length > 0) {
       const productImagesToCreate = basic.imgs.map((imageUrl, index) => ({
         product_id: productId,
         image_url: imageUrl,
-        display_order: (index + 1) * 100000, // Gán display_order dựa trên vị trí trong mảng
+        display_order: (index + 1) * 100000, 
       }));
 
       await ProductImage.bulkCreate(productImagesToCreate, { transaction });
     }
 
-    // --- BƯỚC 4: XỬ LÝ OPTIONS VÀ OPTIONVALUES ---
+    
     const optionValueMap = new Map();
     if (options && Array.isArray(options)) {
       for (const optData of options) {
@@ -109,7 +111,7 @@ const createProductWithDetails = async (req, res) => {
       }
     }
 
-    // --- BƯỚC 5: XỬ LÝ PRODUCTVARIANTS VÀ VARIANTOPTIONSELECTIONS ---
+    
     const variantIdMap = new Map();
     if (variants && Array.isArray(variants)) {
       for (const variantData of variants) {
@@ -119,7 +121,7 @@ const createProductWithDetails = async (req, res) => {
           throw new Error(`SKU biến thể không được để trống.`);
         }
         if (isNaN(parseFloat(String(variantData.price).replace(/\./g, "")))) {
-          // Đảm bảo xử lý giá đúng
+          
           throw new Error(
             `Giá biến thể cho SKU '${variantData.sku}' không hợp lệ.`
           );
@@ -165,7 +167,7 @@ const createProductWithDetails = async (req, res) => {
       }
     }
 
-    // --- BƯỚC 6: XỬ LÝ SERVICEPACKAGES VÀ PACKAGESERVICEITEMS ---
+    
     if (services && Array.isArray(services)) {
       for (const serviceSkuData of services) {
         if (serviceSkuData.isRemove) continue;
@@ -258,8 +260,7 @@ const createProductWithDetails = async (req, res) => {
       }
     }
 
-    // --- BƯỚC 7: XỬ LÝ PRODUCTATTRIBUTES VÀ PRODUCTSPECIFICATIONS (Tối ưu hóa việc thêm mới) ---
-    if (attributes && Array.isArray(attributes) && attributes.length > 0) {
+      if (attributes && Array.isArray(attributes) && attributes.length > 0) {
       const specificationsToCreate = [];
 
       for (const groupData of attributes) {
@@ -729,7 +730,6 @@ const getProductDetails = async (req, res) => {
       existingOrderVariantIds.map((item) => item.variant_id)
     );
 
-    // --- BƯỚC 2: TRUY VẤN THÔNG TIN SẢN PHẨM NHƯ BÌNH THƯỜNG ---
     const productData = await Product.findOne({
       where: { product_id: productId },
       include: [
@@ -772,7 +772,7 @@ const getProductDetails = async (req, res) => {
         {
           model: ProductSpecification,
           as: "specifications",
-          attributes: ["specification_id", "attribute_value", "attribute_id"], // Đã thêm "attribute_id"
+          attributes: ["specification_id", "attribute_value", "attribute_id"], 
         },
       ],
       attributes: { exclude: ["created_at", "updated_at"] },
@@ -784,14 +784,14 @@ const getProductDetails = async (req, res) => {
 
     const product = productData.toJSON();
 
-    // Tách mảng product_images ra khỏi đối tượng product
+    
     const productImgs = product.product_images;
     delete product.product_images;
 
     const variants = [];
     const servicePackages = [];
 
-    // --- BƯỚC 3: XỬ LÝ VÀ TÁI CẤU TRÚC DỮ LIỆU ---
+
     if (product.variants && product.variants.length > 0) {
       product.variants.forEach((variant) => {
         const {
@@ -804,7 +804,7 @@ const getProductDetails = async (req, res) => {
         );
         variants.push(variantWithoutPackages);
 
-        // Lặp qua tất cả gói dịch vụ của biến thể hiện tại và thêm vào mảng chung
+        
         currentServicePackages.forEach((pkg) => {
           const mappedItems = pkg.packageItems.map((item) => ({
             itemId: item.package_service_item_id,
@@ -826,8 +826,7 @@ const getProductDetails = async (req, res) => {
       });
     }
 
-    // --- BƯỚC 3: XỬ LÝ THÔNG SỐ KỸ THUẬT THEO LOGIC MỚI ---
-    // Truy vấn tất cả AttributeGroup và ProductAttribute của category
+  
     const attributeGroupsData = await AttributeGroup.findAll({
       where: { category_id: product.category_id },
       include: {
@@ -851,7 +850,7 @@ const getProductDetails = async (req, res) => {
       ],
     });
 
-    // Tạo cấu trúc cơ sở groupedSpecifications
+    
     const groupedSpecifications = {};
     attributeGroupsData.forEach((group) => {
       const groupJson = group.toJSON();
@@ -869,16 +868,15 @@ const getProductDetails = async (req, res) => {
           displayOrder: attr.display_order,
           isFilterable: attr.is_filterable,
           unit: attr.unit,
-          attributeValues: [], // Luôn tồn tại, ban đầu là mảng rỗng
+          attributeValues: [], 
         };
       });
     });
 
-    // Điền giá trị từ product.specifications (nếu có)
+    
     if (product.specifications && product.specifications.length > 0) {
       product.specifications.forEach((spec) => {
-        // Tìm thuộc tính tương ứng và thêm giá trị
-        // Sử dụng try-catch để phòng trường hợp dữ liệu không khớp
+     
         try {
           const attribute = Object.values(groupedSpecifications)
             .flatMap((group) => Object.values(group.attributes))
@@ -898,7 +896,7 @@ const getProductDetails = async (req, res) => {
       });
     }
 
-    // Chuyển đối tượng thành mảng và sắp xếp để trả về frontend
+    
     const finalSpecifications = Object.values(groupedSpecifications).map(
       (group) => {
         group.attributes = Object.values(group.attributes);
@@ -927,14 +925,49 @@ const getProductDetails = async (req, res) => {
   }
 };
 
-const getAllProducts = async (req, res) => {
+const getAllProductsByFilter = async (req, res) => {
+  const { brandId, categoryId } = req.body;
+  const whereClause = {};
+
+  if (brandId) {
+    whereClause.brand_id = brandId;
+  }
+  if (categoryId) {
+    whereClause.category_id = categoryId;
+  }
+
   try {
-    const products = await Product.findAll();
+    const products = await Product.findAll({
+      where: whereClause,
+
+      include: [
+        {
+          model: Brand,
+          as: "brand",
+          attributes: ["brand_id", "brand_name"],
+        },
+        {
+          model: Category,
+          as: "category",
+          attributes: ["category_id", "category_name"],
+        },
+      ],
+      attributes: {
+        include: [
+          [
+            sequelize.literal(
+              `(SELECT COUNT(*) FROM productvariants WHERE productvariants.product_id = products.product_id) > 0`
+            ),
+            "hasVariant",
+          ],
+        ],
+      },
+    });
 
     if (products.length > 0) {
       return res.status(200).json(products);
     } else {
-      return res.status(404).json({ message: "No products found." });
+      return res.status(200).json([]);
     }
   } catch (error) {
     console.error("Error fetching products:", error);
@@ -962,7 +995,7 @@ const editProductImgs = async (req, res) => {
     const deletePromises = [];
 
     for (const img of productImgs) {
-      if (typeof img.img_id === "string" && img.image_url) {
+      if (typeof img.img_id === "string" && img.image_url && !img.isRemove) {
         createPromises.push(
           ProductImage.create(
             {
@@ -1036,29 +1069,45 @@ const editVariants = async (req, res) => {
     });
   }
 
-  // Sử dụng transaction để đảm bảo tính toàn vẹn của dữ liệu
   const t = await sequelize.transaction();
   try {
     const updatePromises = [];
     const deletePromises = [];
 
     for (const variant of variants) {
-      // Trường hợp 1: isRemove = true -> Xóa biến thể
       if (variant.isRemove) {
         if (typeof variant.variant_id === "number") {
+          const variantToDelete = await db.ProductVariant.findOne({
+            where: {
+              variant_id: variant.variant_id,
+              product_id: productId,
+            },
+            transaction: t,
+          });
+          if (variantToDelete && variantToDelete.image_url) {
+            deletePromises.push(
+              deleteImageFromFirebase(variantToDelete.image_url)
+            );
+          }
           deletePromises.push(
+            ServicePackage.destroy({
+              where: { variant_id: variant.variant_id },
+              transaction: t,
+            }),
+            VariantOptionSelection.destroy({
+              where: { variant_id: variant.variant_id },
+              transaction: t,
+            }),
             ProductVariant.destroy({
               where: {
                 variant_id: variant.variant_id,
-                product_id: productId, // Đảm bảo chỉ xóa biến thể của sản phẩm này
+                product_id: productId,
               },
               transaction: t,
             })
           );
         }
-      }
-      // Trường hợp 2: isRemove = false -> Cập nhật biến thể
-      else {
+      } else {
         if (typeof variant.variant_id === "number") {
           const cleanedPrice = parseFloat(
             String(variant.price).replace(/\./g, "")
@@ -1086,10 +1135,8 @@ const editVariants = async (req, res) => {
       }
     }
 
-    // Thực hiện tất cả các promises xóa và cập nhật đồng thời
     await Promise.all([...updatePromises, ...deletePromises]);
 
-    // Commit transaction nếu mọi thứ đều thành công
     await t.commit();
 
     return res.status(200).json({
@@ -1097,7 +1144,6 @@ const editVariants = async (req, res) => {
       productId: productId,
     });
   } catch (error) {
-    // Rollback transaction nếu có lỗi xảy ra
     await t.rollback();
     console.error("Error editing product variants:", error);
     return res.status(500).json({
@@ -1110,28 +1156,27 @@ const editVariants = async (req, res) => {
 const editService = async (req, res) => {
   const { servicePackages } = req.body;
 
+  console.log(servicePackages);
+
   if (!servicePackages || !Array.isArray(servicePackages)) {
     return res.status(400).json({ message: "Dữ liệu không hợp lệ." });
   }
 
   try {
     await sequelize.transaction(async (t) => {
-      // --- GIAI ĐOẠN 1: XỬ LÝ CÁC GÓI DỊCH VỤ ĐÃ TỒN TẠI (CẬP NHẬT & XÓA) ---
       for (const pkg of servicePackages) {
         if (typeof pkg.packageId === "number") {
           if (pkg.isRemove) {
-            // Xóa tất cả dịch vụ con trước
             await PackageServiceItem.destroy({
               where: { package_id: pkg.packageId },
               transaction: t,
             });
-            // Sau đó, xóa gói dịch vụ
+
             await ServicePackage.destroy({
               where: { package_id: pkg.packageId },
               transaction: t,
             });
           } else {
-            // Cập nhật thông tin gói dịch vụ
             await ServicePackage.update(
               {
                 package_name: pkg.packageName,
@@ -1144,20 +1189,17 @@ const editService = async (req, res) => {
               }
             );
 
-            // Xử lý các dịch vụ con bên trong
             for (const item of pkg.items) {
               const cleanedPrice = parseFloat(
                 String(item.itemPriceImpact).replace(/\./g, "")
               );
               if (typeof item.itemId === "number") {
                 if (item.isRemove) {
-                  // Xóa dịch vụ con cụ thể
                   await PackageServiceItem.destroy({
                     where: { package_service_item_id: item.itemId },
                     transaction: t,
                   });
                 } else {
-                  // Cập nhật thông tin dịch vụ con
                   await PackageServiceItem.update(
                     {
                       item_price_impact: cleanedPrice,
@@ -1176,7 +1218,6 @@ const editService = async (req, res) => {
         }
       }
 
-      // --- GIAI ĐOẠN 2: XỬ LÝ CÁC GÓI DỊCH VỤ VÀ DỊCH VỤ CON MỚI (TẠO MỚI) ---
       for (const pkg of servicePackages) {
         if (typeof pkg.packageId === "string") {
           if (!pkg.isRemove) {
@@ -1209,7 +1250,6 @@ const editService = async (req, res) => {
             }
           }
         } else if (typeof pkg.packageId === "number" && !pkg.isRemove) {
-          // Xử lý các dịch vụ con mới cho gói dịch vụ đã tồn tại
           for (const item of pkg.items) {
             if (typeof item.itemId === "string") {
               if (!item.isRemove) {
@@ -1251,13 +1291,9 @@ const editSpecifications = async (req, res) => {
 
   try {
     await sequelize.transaction(async (t) => {
-      // Lặp qua từng nhóm thuộc tính (AttributeGroup)
       for (const group of attributeGroups) {
-        // Lặp qua từng thuộc tính con (ProductAttribute)
         for (const attribute of group.attributes) {
-          // Lặp qua từng giá trị thuộc tính (ProductSpecification)
           for (const value of attribute.attributeValues) {
-            // Trường hợp 1: Xóa một thông số kỹ thuật đã tồn tại
             if (value.isRemove) {
               if (typeof value.attributeValueId === "number") {
                 await ProductSpecification.destroy({
@@ -1265,11 +1301,7 @@ const editSpecifications = async (req, res) => {
                   transaction: t,
                 });
               }
-              // Nếu là chuỗi (bản ghi mới), chỉ cần bỏ qua
-            }
-            // Trường hợp 2: Cập nhật hoặc thêm mới thông số kỹ thuật
-            else {
-              // Cập nhật thông số kỹ thuật đã tồn tại
+            } else {
               if (typeof value.attributeValueId === "number") {
                 await ProductSpecification.update(
                   {
@@ -1282,9 +1314,7 @@ const editSpecifications = async (req, res) => {
                     transaction: t,
                   }
                 );
-              }
-              // Thêm mới thông số kỹ thuật
-              else if (
+              } else if (
                 typeof value.attributeValueId === "string" &&
                 value.attributeValueName.trim() !== ""
               ) {
@@ -1312,6 +1342,36 @@ const editSpecifications = async (req, res) => {
       message: "An error occurred while updating product specifications.",
       error: error.message,
     });
+  }
+};
+
+const editProductBasicInfo = async (req, res) => {
+  const { productInfo } = req.body;
+  const { product_id, ...updateData } = productInfo;
+  try {
+    const [updatedRowsCount, updatedProducts] = await Product.update(
+      updateData,
+      {
+        where: {
+          product_id: product_id,
+        },
+        returning: true,
+      }
+    );
+
+    if (updatedRowsCount === 0) {
+      return res.status(404).json({ message: "Product not found." });
+    }
+
+    res.status(200).json({
+      message: "Product updated successfully.",
+      product: updatedProducts[0],
+    });
+  } catch (error) {
+    console.error("Error updating product:", error);
+    res
+      .status(500)
+      .json({ message: "An error occurred while updating the product." });
   }
 };
 
@@ -1352,15 +1412,13 @@ const getLatestProducts = async (req, res) => {
   const { limit } = req.params;
 
   try {
-    // Bước 1: Tìm 5 Product mới nhất dựa trên created_at
     const latestProducts = await Product.findAll({
       attributes: ["product_id", "sale_volume", "created_at"],
       order: [["created_at", "DESC"]],
       limit: parseInt(limit, 10),
-      raw: true, // Lấy kết quả dưới dạng JSON thuần
+      raw: true,
     });
 
-    // Bước 2: Với mỗi Product mới nhất, tìm Variant mới nhất của nó
     const latestVariantsPromises = latestProducts.map(async (product) => {
       const latestVariant = await ProductVariant.findOne({
         where: { product_id: product.product_id },
@@ -1403,7 +1461,7 @@ const getLatestProducts = async (req, res) => {
   }
 };
 
-const getProductByfilter = async (req, res) => {
+const getPageProductByfilter = async (req, res) => {
   const { categoryId, brandId } = req.body;
   console.log(req.body);
   const page = parseInt(req.query.page) || 1;
@@ -1464,16 +1522,55 @@ const getProductByfilter = async (req, res) => {
   }
 };
 
+const searchTopProducts = async (req, res) => {
+  const { keyword } = req.query;
+
+  if (!keyword) {
+    return res.status(400).send({
+      message: "Từ khóa tìm kiếm không được để trống.",
+    });
+  }
+
+  try {
+    const products = await Product.findAll({
+      where: {
+        product_name: { [Op.like]: `%${keyword}%` },
+      },
+      order: [["sale_volume", "DESC"]],
+      limit: 10,
+      include: [
+        {
+          model: ProductVariant,
+          as: "variants",
+        },
+      ],
+    });
+
+    res.status(200).send({
+      message: "Tìm kiếm thành công, hiển thị 10 sản phẩm bán chạy nhất.",
+      totalResults: products.length,
+      products: products,
+    });
+  } catch (error) {
+    res.status(500).send({
+      message: "Lỗi khi tìm kiếm sản phẩm.",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createProductWithDetails,
   getProductVariantDetails,
   getProductDetails,
-  getAllProducts,
+  getAllProductsByFilter,
   editProductImgs,
   editVariants,
   editService,
   editSpecifications,
   getTopSaleVariants,
   getLatestProducts,
-  getProductByfilter,
+  getPageProductByfilter,
+  editProductBasicInfo,
+  searchTopProducts,
 };

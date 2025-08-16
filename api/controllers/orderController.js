@@ -10,6 +10,8 @@ const {
   Product,
 } = db;
 
+const { VNPay, dateFormat } = require("vnpay");
+
 const {
   createTraditionalOrder,
 } = require("../services/payment/traditionalPaymentService");
@@ -22,7 +24,7 @@ const paymentStrategies = {
 };
 
 const createOrder = async (req, res) => {
-  const { cartId, method } = req.body;
+  const { cartId, method, guestInfo } = req.body;
   const userId = req.user?.id;
   const sessionId = req.sessionId;
 
@@ -49,7 +51,13 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ message: "Invalid payment method." });
     }
 
-    const result = await createOrderFunction({ cartId, method });
+    const result = await createOrderFunction({
+      cartId,
+      method,
+      userId,
+      sessionId,
+      guestInfo,
+    });
 
     if (method === "traditional") {
       return res.status(201).json(result.order_id);
@@ -215,8 +223,6 @@ const getOrderCustomer = async (req, res) => {
   const { status } = req.body;
   let orderIdentifier;
 
-  console.log(status);
-
   if (req.isGuest) {
     orderIdentifier = { session_id: req.sessionId };
   } else {
@@ -340,6 +346,7 @@ const editOrderStatus = async (req, res) => {
     }
 
     const currentStatus = order.order_status;
+    let payment_status = "unpaid";
 
     if (currentStatus !== status) {
       if (currentStatus === "pending" && status === "preparing") {
@@ -371,9 +378,13 @@ const editOrderStatus = async (req, res) => {
           const newSaleVolume = product.sale_volume + item.quantity;
           await product.update({ sale_volume: newSaleVolume });
         }
+        payment_status = "paid";
       }
 
-      await order.update({ order_status: status });
+      await order.update({
+        order_status: status,
+        payment_status: payment_status,
+      });
 
       return res
         .status(200)
@@ -389,10 +400,63 @@ const editOrderStatus = async (req, res) => {
   }
 };
 
+const checkVNPay = async (req, res) => {
+  const { userId, sessionId, ...queryParams } = req.query;
+
+  try {
+    const vnpay = new VNPay({
+      tmnCode: "0TSSC1QT",
+      secureSecret: "OTYGF8UKW9QVWWTE0BTY82Z1P3LOUA47",
+    });
+
+    const isValidSignature = vnpay.verifyReturnUrl(queryParams);
+
+    if (!isValidSignature.isVerified || !isValidSignature.isSuccess) {
+      return res.redirect("http://localhost:3001/home");
+    }
+
+    const { vnp_TxnRef, vnp_ResponseCode } = queryParams;
+    const orderId = vnp_TxnRef;
+    if (vnp_ResponseCode === "00") {
+      console.log("✅ Payment success:", vnp_TxnRef);
+
+      await Order.update(
+        { payment_status: "paid" },
+        { where: { order_id: orderId } }
+      );
+
+      if (userId) {
+        await Cart.destroy({ where: { user_id: userId } });
+      }
+
+      if (sessionId) {
+        await Cart.destroy({ where: { session_id: sessionId } });
+      }
+
+      return res.redirect("http://localhost:3001/home");
+    } else {
+      console.warn("❌ Payment failed:", vnp_TxnRef);
+
+      await Order.destroy({ where: { order_id: orderId } });
+
+      return res.redirect("http://localhost:3001/home");
+    }
+  } catch (error) {
+    console.error("Error in checkVNPay controller:", error);
+
+    res.status(500).send({
+      message:
+        error.message ||
+        "An unexpected error occurred while fetching revenue data.",
+    });
+  }
+};
+
 module.exports = {
   createOrder,
   getOrderAdmin,
   getOrderCustomer,
   getOrderQuarterlyRevenue,
   editOrderStatus,
+  checkVNPay,
 };

@@ -2,6 +2,7 @@ const db = require("../models");
 const AttributeGroup = db.AttributeGroup;
 const ProductAttribute = db.ProductAttribute;
 const Category = db.Category;
+
 const getAttributesByCategory = async (req, res) => {
   const { categoryId } = req.body;
 
