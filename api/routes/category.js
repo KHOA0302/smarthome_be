@@ -10,5 +10,11 @@ router.post(
   authorize("admin"),
   categoryController.createCategory
 );
+router.put(
+  "/edit-category",
+  protect,
+  authorize("admin"),
+  categoryController.editCategory
+);
 
 module.exports = router;

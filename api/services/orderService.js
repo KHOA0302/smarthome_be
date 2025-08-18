@@ -5,15 +5,13 @@ const { Op } = require("sequelize");
 const Sequelize = db.Sequelize;
 
 /**
- 
- * @param {number} year 
- * @returns {Promise<Array<Object>>} 
- 
+ * @param {number} year
+ * @returns {Promise<Array<Object>>}
  */
 
 const getQuarterlyCategorySales = (orders, quarters) => {
-  const quarterlyCategorySales = {}; // Stores category sales per quarter
-  const totalQuantitySoldPerQuarter = {}; // Stores total quantity sold for each quarter
+  const quarterlyCategorySales = {};
+  const totalQuantitySoldPerQuarter = {};
 
   orders.forEach((order) => {
     const orderDate = new Date(order.created_at);
@@ -58,15 +56,11 @@ const getQuarterlyCategorySales = (orders, quarters) => {
 };
 
 /**
- * Calculates the quarterly revenue, grouped by year, and includes comparison to the previous quarter.
- * Also includes top categories sold per quarter and comparison of total product quantity.
- * Only considers orders with 'completed' status and 'paid' payment status.
- * Can filter by a specific year range if startYear and endYear are provided.
- * @param {number} [startYear] - Optional. The starting year for revenue calculation.
- * @param {number} [endYear] - Optional. The ending year for revenue calculation.
- * @returns {Promise<Array<Object>>} A promise that resolves to an array of objects,
- * each representing a year with its quarterly revenue, comparison data, and category sales.
+ * @param {number} [startYear]
+ * @param {number} [endYear]
+ * @returns {Promise<Array<Object>>}
  */
+
 const getRevenueByYearAndQuarter = async (startYear, endYear) => {
   try {
     const quarters = [
@@ -156,8 +150,7 @@ const getRevenueByYearAndQuarter = async (startYear, endYear) => {
     );
 
     let previousQuarterRevenue = null;
-    let previousQuarterTotalQuantity = null; // New variable to track total quantity of previous quarter
-
+    let previousQuarterTotalQuantity = null;
     const currentFullDate = new Date();
     const currentYear = currentFullDate.getFullYear();
     const currentMonth = currentFullDate.getMonth() + 1;
@@ -179,14 +172,13 @@ const getRevenueByYearAndQuarter = async (startYear, endYear) => {
         let diffPercentRevenueStatus = null;
         let diffPercentRevenue = null;
 
-        // --- Revenue Comparison Logic ---
         if (previousQuarterRevenue !== null) {
           const diff = currentQuarterRevenue - previousQuarterRevenue;
 
           if (previousQuarterRevenue === 0) {
             if (currentQuarterRevenue > 0) {
               diffPercentRevenueStatus = "increase";
-              diffPercentRevenue = 100; // Representing a significant increase from zero
+              diffPercentRevenue = 100;
             } else {
               diffPercentRevenueStatus = "stable";
               diffPercentRevenue = 0;
@@ -208,7 +200,6 @@ const getRevenueByYearAndQuarter = async (startYear, endYear) => {
           diffPercentRevenueStatus = null;
           diffPercentRevenue = null;
         }
-        // --- End Revenue Comparison Logic ---
 
         const categoriesInQuarter = [];
         const quarterCategories =
@@ -233,7 +224,6 @@ const getRevenueByYearAndQuarter = async (startYear, endYear) => {
 
         categoriesInQuarter.sort((a, b) => b.sold_quantity - a.sold_quantity);
 
-        // --- Product Quantity Comparison Logic (New) ---
         let diffPercentProductStatus = null;
         let diffPercentProduct = null;
 
@@ -244,7 +234,7 @@ const getRevenueByYearAndQuarter = async (startYear, endYear) => {
           if (previousQuarterTotalQuantity === 0) {
             if (totalSoldInQuarter > 0) {
               diffPercentProductStatus = "increase";
-              diffPercentProduct = 100; // Representing a significant increase from zero
+              diffPercentProduct = 100;
             } else {
               diffPercentProductStatus = "stable";
               diffPercentProduct = 0;
@@ -267,7 +257,6 @@ const getRevenueByYearAndQuarter = async (startYear, endYear) => {
           diffPercentProductStatus = null;
           diffPercentProduct = null;
         }
-        // --- End Product Quantity Comparison Logic ---
 
         yearData.quarters.push({
           name: quarterName,
@@ -275,12 +264,12 @@ const getRevenueByYearAndQuarter = async (startYear, endYear) => {
           diffPercentRevenueStatus: diffPercentRevenueStatus,
           diffPercentRevenue: diffPercentRevenue,
           products: categoriesInQuarter,
-          diffPercentProductStatus: diffPercentProductStatus, // New field
-          diffPercentProduct: diffPercentProduct, // New field
+          diffPercentProductStatus: diffPercentProductStatus,
+          diffPercentProduct: diffPercentProduct,
         });
 
         previousQuarterRevenue = currentQuarterRevenue;
-        previousQuarterTotalQuantity = totalSoldInQuarter; // Update for next iteration
+        previousQuarterTotalQuantity = totalSoldInQuarter;
       }
       if (yearData.quarters.length > 0) {
         formattedRevenue.push(yearData);

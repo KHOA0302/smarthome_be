@@ -10,5 +10,6 @@ router.post(
   authorize("admin"),
   brandController.createBrand
 );
+router.put("/edit-brand", brandController.editBrand);
 
 module.exports = router;

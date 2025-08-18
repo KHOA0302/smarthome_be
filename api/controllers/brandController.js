@@ -1,5 +1,5 @@
 const db = require("../models");
-const Brand = db.Brand;
+const { Brand, Product } = db;
 
 const getAllBrands = async (req, res) => {
   try {
@@ -153,10 +153,80 @@ const deleteBrand = async (req, res) => {
   }
 };
 
+const editBrand = async (req, res) => {
+  const { newBrand } = req.body;
+  const brand_id = newBrand.brand_id;
+  const isRemove = newBrand.isRemove;
+
+  if (!brand_id) {
+    return res.status(400).json({
+      message: "Lỗi: Không tìm thấy brand_id để cập nhật/xóa.",
+    });
+  }
+
+  if (isRemove) {
+    try {
+      const productCount = await Product.count({
+        where: { brand_id: brand_id },
+      });
+
+      if (productCount > 0) {
+        return res.status(409).json({
+          message: `Không thể xóa thương hiệu này vì có ${productCount} sản phẩm liên quan.`,
+        });
+      }
+
+      const brandDeleted = await Brand.destroy({
+        where: { brand_id: brand_id },
+      });
+
+      if (brandDeleted === 0) {
+        return res.status(404).json({
+          message: "Không tìm thấy thương hiệu để xóa.",
+        });
+      }
+
+      return res.status(200).json({
+        message: "Xóa thương hiệu thành công.",
+      });
+    } catch (error) {
+      console.error("Lỗi khi xóa thương hiệu:", error);
+      return res.status(500).json({
+        message: "Lỗi máy chủ nội bộ khi xóa.",
+        error: error.message,
+      });
+    }
+  }
+
+  try {
+    const [rowsAffected] = await Brand.update(newBrand, {
+      where: { brand_id: brand_id },
+    });
+
+    if (rowsAffected === 0) {
+      console.log(newBrand, brand_id, rowsAffected);
+      return res.status(404).json({
+        message: `Không tìm thấy thương hiệu hoặc không có sự thay đổi được thực thi.`,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Cập nhật thương hiệu thành công.",
+    });
+  } catch (error) {
+    console.error("Lỗi khi cập nhật thương hiệu:", error);
+    return res.status(500).json({
+      message: "Lỗi máy chủ nội bộ khi cập nhật.",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllBrands,
   getBrandById,
   createBrand,
   updateBrand,
   deleteBrand,
+  editBrand,
 };

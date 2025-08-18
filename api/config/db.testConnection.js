@@ -1,4 +1,4 @@
-const db = require("../models"); // Import đối tượng db đã được khởi tạo
+const db = require("../models");
 
 const testDbConnection = async () => {
   try {

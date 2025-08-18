@@ -1,6 +1,6 @@
 const { initializeApp } = require("firebase/app");
-const { getStorage } = require("firebase/storage");
-const { getFirestore } = require("firebase/firestore"); // N
+const { getStorage, ref, deleteObject } = require("firebase/storage");
+const { getFirestore } = require("firebase/firestore");
 
 const firebaseConfig = {
   apiKey: "AIzaSyBtqCfby2M31RN3m_B_dwIUyBs2c90b2cI",
@@ -15,6 +15,8 @@ const app = initializeApp(firebaseConfig);
 
 module.exports = {
   app: app,
+  ref,
+  deleteObject,
   storage: getStorage(app),
   db: getFirestore(app),
 };

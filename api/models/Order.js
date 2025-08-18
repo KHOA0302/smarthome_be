@@ -11,6 +11,10 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.INTEGER,
         allowNull: true,
       },
+      session_id: {
+        type: Sequelize.STRING(255),
+        allowNull: true,
+      },
       guest_email: {
         type: Sequelize.STRING(255),
         allowNull: true,
