@@ -42,8 +42,8 @@ module.exports = (sequelize, Sequelize) => {
     ProductAttribute.hasMany(db.ProductSpecification, {
       foreignKey: "attribute_id",
       as: "productspecifications",
-      onDelete: "CASCADE", // Thêm dòng này
-      onUpdate: "CASCADE", // Thêm dòng này
+      onDelete: "CASCADE", 
+      onUpdate: "CASCADE", 
     });
   };
 

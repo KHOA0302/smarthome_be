@@ -30,7 +30,6 @@ const createProductWithDetails = async (req, res) => {
   try {
     transaction = await db.sequelize.transaction();
 
-   
     if (!basic || !basic.name || basic.name.trim() === "") {
       throw new Error("Tên sản phẩm (basic.name) không được để trống.");
     }
@@ -41,7 +40,6 @@ const createProductWithDetails = async (req, res) => {
       throw new Error("ID danh mục (basic.category) không được để trống.");
     }
 
-    
     const existingBrand = await Brand.findByPk(basic.brand, { transaction });
     if (!existingBrand) {
       throw new Error(`Thương hiệu với ID ${basic.brand} không tồn tại.`);
@@ -54,7 +52,6 @@ const createProductWithDetails = async (req, res) => {
       throw new Error(`Danh mục với ID ${basic.category} không tồn tại.`);
     }
 
-   
     const newProduct = await Product.create(
       {
         product_name: basic.name.trim(),
@@ -67,18 +64,16 @@ const createProductWithDetails = async (req, res) => {
 
     const productId = newProduct.product_id;
 
-    
     if (basic.imgs && Array.isArray(basic.imgs) && basic.imgs.length > 0) {
       const productImagesToCreate = basic.imgs.map((imageUrl, index) => ({
         product_id: productId,
         image_url: imageUrl,
-        display_order: (index + 1) * 100000, 
+        display_order: (index + 1) * 100000,
       }));
 
       await ProductImage.bulkCreate(productImagesToCreate, { transaction });
     }
 
-    
     const optionValueMap = new Map();
     if (options && Array.isArray(options)) {
       for (const optData of options) {
@@ -111,7 +106,6 @@ const createProductWithDetails = async (req, res) => {
       }
     }
 
-    
     const variantIdMap = new Map();
     if (variants && Array.isArray(variants)) {
       for (const variantData of variants) {
@@ -121,7 +115,6 @@ const createProductWithDetails = async (req, res) => {
           throw new Error(`SKU biến thể không được để trống.`);
         }
         if (isNaN(parseFloat(String(variantData.price).replace(/\./g, "")))) {
-          
           throw new Error(
             `Giá biến thể cho SKU '${variantData.sku}' không hợp lệ.`
           );
@@ -167,7 +160,6 @@ const createProductWithDetails = async (req, res) => {
       }
     }
 
-    
     if (services && Array.isArray(services)) {
       for (const serviceSkuData of services) {
         if (serviceSkuData.isRemove) continue;
@@ -260,7 +252,7 @@ const createProductWithDetails = async (req, res) => {
       }
     }
 
-      if (attributes && Array.isArray(attributes) && attributes.length > 0) {
+    if (attributes && Array.isArray(attributes) && attributes.length > 0) {
       const specificationsToCreate = [];
 
       for (const groupData of attributes) {
@@ -772,7 +764,7 @@ const getProductDetails = async (req, res) => {
         {
           model: ProductSpecification,
           as: "specifications",
-          attributes: ["specification_id", "attribute_value", "attribute_id"], 
+          attributes: ["specification_id", "attribute_value", "attribute_id"],
         },
       ],
       attributes: { exclude: ["created_at", "updated_at"] },
@@ -784,13 +776,11 @@ const getProductDetails = async (req, res) => {
 
     const product = productData.toJSON();
 
-    
     const productImgs = product.product_images;
     delete product.product_images;
 
     const variants = [];
     const servicePackages = [];
-
 
     if (product.variants && product.variants.length > 0) {
       product.variants.forEach((variant) => {
@@ -804,7 +794,6 @@ const getProductDetails = async (req, res) => {
         );
         variants.push(variantWithoutPackages);
 
-        
         currentServicePackages.forEach((pkg) => {
           const mappedItems = pkg.packageItems.map((item) => ({
             itemId: item.package_service_item_id,
@@ -826,7 +815,6 @@ const getProductDetails = async (req, res) => {
       });
     }
 
-  
     const attributeGroupsData = await AttributeGroup.findAll({
       where: { category_id: product.category_id },
       include: {
@@ -850,7 +838,6 @@ const getProductDetails = async (req, res) => {
       ],
     });
 
-    
     const groupedSpecifications = {};
     attributeGroupsData.forEach((group) => {
       const groupJson = group.toJSON();
@@ -868,15 +855,13 @@ const getProductDetails = async (req, res) => {
           displayOrder: attr.display_order,
           isFilterable: attr.is_filterable,
           unit: attr.unit,
-          attributeValues: [], 
+          attributeValues: [],
         };
       });
     });
 
-    
     if (product.specifications && product.specifications.length > 0) {
       product.specifications.forEach((spec) => {
-     
         try {
           const attribute = Object.values(groupedSpecifications)
             .flatMap((group) => Object.values(group.attributes))
@@ -896,7 +881,6 @@ const getProductDetails = async (req, res) => {
       });
     }
 
-    
     const finalSpecifications = Object.values(groupedSpecifications).map(
       (group) => {
         group.attributes = Object.values(group.attributes);
@@ -1559,6 +1543,105 @@ const searchTopProducts = async (req, res) => {
   }
 };
 
+////////////////////////////////////////////////////////////////////////////
+const res = require("express/lib/response");
+
+const searchProductByName = async (req, res) => {
+  try {
+    const { name } = req.body; // hoặc req.query nếu GET
+
+    if (!name) {
+      return res.status(400).json({ message: "Tên sản phẩm là bắt buộc." });
+    }
+
+    const products = await Product.findAll({
+      where: {
+        product_name: { [Op.like]: `%${name}%` },
+      },
+      include: [
+        {
+          model: ProductVariant,
+          as: "variants",
+          attributes: ["variant_id", "price"], // ✅ lấy giá ở đây
+          limit: 1, // nếu bạn chỉ muốn 1 giá đại diện
+        },
+      ],
+      attributes: ["product_id", "product_name"], // ❌ bỏ 'price' vì không có
+    });
+
+    if (!products || products.length === 0) {
+      return res.status(404).json({ message: "Hiện không có sản phẩm." });
+    }
+
+    // Nếu bạn muốn trả về giá đại diện từ variant đầu tiên
+    const mappedProducts = products.map((p) => {
+      const json = p.toJSON();
+      return {
+        product_id: json.product_id,
+        product_name: json.product_name,
+        price: json.variants.length > 0 ? json.variants[0].price : null, // ✅
+      };
+    });
+
+    return res.status(200).json(mappedProducts);
+  } catch (error) {
+    console.error("Error searching product:", error);
+    return res
+      .status(500)
+      .json({ message: "Lỗi khi tìm sản phẩm.", error: error.message });
+  }
+};
+
+const getProductShortDetails = async (req, res) => {
+  const { productId } = req.params;
+
+  if (!productId) {
+    return res.status(404).json({ message: "Product ID is required." });
+  }
+
+  try {
+    // Truy vấn chỉ lấy tên và giá
+    const productData = await Product.findOne({
+      where: { product_id: productId },
+      attributes: ["product_id", "product_name", "price"], // 👈 chỉ lấy tên và giá
+      // Nếu giá nằm ở bảng variant thì include 1 variant
+      include: [
+        {
+          model: ProductVariant,
+          as: "variants",
+          attributes: ["price"],
+          required: false, // vẫn trả về nếu không có variant
+        },
+      ],
+    });
+
+    if (!productData) {
+      return res.status(404).json({ message: "Product not found." });
+    }
+
+    const product = productData.toJSON();
+
+    // Ưu tiên giá từ Product, nếu không có thì lấy giá từ Variant
+    const price =
+      product.price ??
+      (product.variants && product.variants.length > 0
+        ? product.variants[0].price
+        : null);
+
+    return res.status(200).json({
+      name: product.product_name,
+      price: price,
+    });
+  } catch (error) {
+    console.error("Error fetching product details:", error);
+    return res.status(500).json({
+      message: "An error occurred while retrieving product details.",
+      error: error.message,
+    });
+  }
+};
+////////////////////////////////////////////////////////////////////////////
+
 module.exports = {
   createProductWithDetails,
   getProductVariantDetails,
@@ -1573,4 +1656,7 @@ module.exports = {
   getPageProductByfilter,
   editProductBasicInfo,
   searchTopProducts,
+  ////////////////////////
+  searchProductByName,
+  getProductShortDetails,
 };

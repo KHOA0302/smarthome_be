@@ -73,7 +73,7 @@ module.exports = (sequelize, Sequelize) => {
     Product.hasMany(db.ProductSpecification, {
       foreignKey: "product_id",
       as: "specifications",
-      onDelete: "CASCADE", // Khi Product bị xóa, các specifications liên quan cũng bị xóa
+      onDelete: "CASCADE",
       onUpdate: "CASCADE",
     });
   };

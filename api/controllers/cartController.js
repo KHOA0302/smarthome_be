@@ -364,7 +364,7 @@ const increaseItem = async (req, res) => {
         cart_id: cartItemToUpdate.cart_id,
         variant_id: variant_id,
       },
-    });
+    });+
 
     console.log(totalQuantity, ">", stockQuantity);
 
