@@ -12,6 +12,8 @@ const productRouter = require("./routes/product");
 const attributeRouter = require("./routes/attribute");
 const cartRouter = require("./routes/cart");
 const orderRouter = require("./routes/order");
+const webhookRouter = require("./routes/webhook");
+
 
 const cors = require("cors");
 
@@ -28,5 +30,7 @@ app.use("/product", productRouter);
 app.use("/attribute", attributeRouter);
 app.use("/cart", cartRouter);
 app.use("/order", orderRouter);
+app.use("/webhook", webhookRouter);
+
 
 module.exports = app;
