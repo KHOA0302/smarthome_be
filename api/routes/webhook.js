@@ -1,50 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const { searchProductByName } = require("../controllers/webhookController");
+const webhookController = require("../controllers/webhookController");
 
-router.post("/", async (req, res) => {
-  try {
-    const intent = req.body.queryResult.intent.displayName;
+// Healthcheck đơn giản
+router.get("/health", (req, res) => res.json({ ok: true }));
 
-    if (intent === "SearchProduct") {
-      const productName = req.body.queryResult.parameters.product_name;
-
-      const product = await searchProductByName(productName);
-
-      if (!product) {
-        return res.json({
-          fulfillmentText: `Xin lỗi, hiện không tìm thấy sản phẩm "${productName}".`,
-        });
-      }
-
-      const price =
-        product.variants && product.variants.length > 0
-          ? product.variants[0].price
-          : "chưa có giá";
-
-     
-      return res.json({
-        followupEventInput: {
-          name: "SHOW_PRICE",
-          languageCode: "vi",
-          parameters: {
-            product_name: product.product_name,
-            price: price,
-          },
-        },
-      });
-    }
-
-
-    return res.json({
-      fulfillmentText: "Xin lỗi, mình chưa hiểu yêu cầu.",
-    });
-  } catch (error) {
-    console.error("Webhook error:", error);
-    return res.json({
-      fulfillmentText: "Hệ thống gặp sự cố khi tìm sản phẩm.",
-    });
-  }
-});
+router.post("/", webhookController.handleWebhook);
 
 module.exports = router;

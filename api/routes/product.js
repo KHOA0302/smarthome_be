@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { protect, authorize } = require("../middleware/authMiddleware");
 const productController = require("../controllers/productController");
+const { identifyUserOrGuest } = require("../middleware/identifyUserOrGuest");
 
 router.post(
   "/add",
@@ -12,6 +13,7 @@ router.post(
 
 router.get(
   "/:product_id/variant/:variant_id",
+  identifyUserOrGuest,
   productController.getProductVariantDetails
 );
 

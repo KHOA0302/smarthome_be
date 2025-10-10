@@ -66,6 +66,9 @@ db.Order = require("./Order.js")(sequelize, Sequelize);
 db.OrderItem = require("./OrderItem.js")(sequelize, Sequelize);
 db.OrderItemService = require("./OrderItemService.js")(sequelize, Sequelize);
 
+//=============================================================//
+db.ProductEvent = require("./ProductEvent.js")(sequelize, Sequelize);
+
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {
     db[modelName].associate(db);

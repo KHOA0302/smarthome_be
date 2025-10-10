@@ -1,4 +1,5 @@
 const db = require("../models");
+const eventQueueService = require("../services/eventQueueService");
 const {
   Product,
   ProductVariant,
@@ -18,6 +19,8 @@ const {
   Order,
   Sequelize,
   sequelize,
+  CartItem,
+  CartItemService,
 } = db;
 const { Op } = db.Sequelize;
 const { deleteImageFromFirebase } = require("../utils/firebase");
@@ -360,6 +363,9 @@ const getProductVariantDetails = async (req, res) => {
         {
           model: db.ProductVariant,
           as: "variants",
+          where: {
+            item_status: "in_stock",
+          },
           attributes: [
             "variant_id",
             "variant_sku",
@@ -681,6 +687,21 @@ const getProductVariantDetails = async (req, res) => {
       variants: allVariants,
       servicePackages: formattedServicePackages,
       groupAttributes: groupAttributes,
+    });
+
+    const trackingData = {
+      event_type: "view",
+      variant_id: parseInt(variant_id),
+      user_id: req.user ? req.user.id : null,
+      session_id: req.sessionId || null,
+      price_at_event: parseFloat(selectedVariant.price),
+    };
+
+    eventQueueService.pushEventToQueue("view", trackingData).catch((error) => {
+      console.error(
+        "[Tracking Error] Không thể push vào Queue:",
+        error.message
+      );
     });
   } catch (error) {
     console.error("Error fetching product details:", error);
@@ -1061,34 +1082,55 @@ const editVariants = async (req, res) => {
     for (const variant of variants) {
       if (variant.isRemove) {
         if (typeof variant.variant_id === "number") {
-          const variantToDelete = await db.ProductVariant.findOne({
+          const cartItems = await CartItem.findAll({
+            where: { variant_id: variant.variant_id },
+            transaction: t,
+          });
+
+          if (cartItems.length > 0) {
+            const cartItemIds = cartItems.map((item) => item.cart_item_id);
+            await CartItemService.destroy({
+              where: { cart_item_id: cartItemIds },
+              transaction: t,
+            });
+
+            await CartItem.destroy({
+              where: { variant_id: variant.variant_id },
+              transaction: t,
+            });
+          }
+
+          await VariantOptionSelection.destroy({
+            where: { variant_id: variant.variant_id },
+            transaction: t,
+          });
+
+          const variantToDelete = await ProductVariant.findOne({
             where: {
               variant_id: variant.variant_id,
               product_id: productId,
             },
             transaction: t,
           });
+
           if (variantToDelete && variantToDelete.image_url) {
-            deletePromises.push(
-              deleteImageFromFirebase(variantToDelete.image_url)
-            );
+            try {
+              await deleteImageFromFirebase(variantToDelete.image_url);
+            } catch (firebaseError) {}
           }
-          deletePromises.push(
-            ServicePackage.destroy({
-              where: { variant_id: variant.variant_id },
-              transaction: t,
-            }),
-            VariantOptionSelection.destroy({
-              where: { variant_id: variant.variant_id },
-              transaction: t,
-            }),
-            ProductVariant.destroy({
+
+          await ProductVariant.update(
+            {
+              stock_quantity: 0,
+              item_status: "out_of_stock",
+            },
+            {
               where: {
                 variant_id: variant.variant_id,
                 product_id: productId,
               },
               transaction: t,
-            })
+            }
           );
         }
       } else {
@@ -1364,6 +1406,9 @@ const getTopSaleVariants = async (req, res) => {
 
   try {
     const topVariants = await ProductVariant.findAll({
+      where: {
+        item_status: "in_stock",
+      },
       attributes: [
         "variant_id",
         "variant_sku",
@@ -1405,7 +1450,7 @@ const getLatestProducts = async (req, res) => {
 
     const latestVariantsPromises = latestProducts.map(async (product) => {
       const latestVariant = await ProductVariant.findOne({
-        where: { product_id: product.product_id },
+        where: { product_id: product.product_id, item_status: "in_stock" },
         attributes: [
           "variant_id",
           "variant_sku",
@@ -1469,7 +1514,13 @@ const getPageProductByfilter = async (req, res) => {
       include: [
         { model: db.Category, as: "category" },
         { model: db.Brand, as: "brand" },
-        { model: db.ProductVariant, as: "variants" },
+        {
+          model: db.ProductVariant,
+          as: "variants",
+          where: {
+            item_status: "in_stock",
+          },
+        },
       ],
       offset: offset,
       limit: limit,
@@ -1526,6 +1577,9 @@ const searchTopProducts = async (req, res) => {
         {
           model: ProductVariant,
           as: "variants",
+          where: {
+            item_status: "in_stock",
+          },
         },
       ],
     });
@@ -1600,17 +1654,16 @@ const getProductShortDetails = async (req, res) => {
   }
 
   try {
-    // Truy vấn chỉ lấy tên và giá
     const productData = await Product.findOne({
       where: { product_id: productId },
-      attributes: ["product_id", "product_name", "price"], // 👈 chỉ lấy tên và giá
-      // Nếu giá nằm ở bảng variant thì include 1 variant
+      attributes: ["product_id", "product_name", "price"],
+
       include: [
         {
           model: ProductVariant,
           as: "variants",
           attributes: ["price"],
-          required: false, // vẫn trả về nếu không có variant
+          required: false,
         },
       ],
     });
@@ -1621,7 +1674,6 @@ const getProductShortDetails = async (req, res) => {
 
     const product = productData.toJSON();
 
-    // Ưu tiên giá từ Product, nếu không có thì lấy giá từ Variant
     const price =
       product.price ??
       (product.variants && product.variants.length > 0
