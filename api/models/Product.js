@@ -76,6 +76,13 @@ module.exports = (sequelize, Sequelize) => {
       onDelete: "CASCADE",
       onUpdate: "CASCADE",
     });
+
+    Product.hasMany(db.Review, {
+      foreignKey: "product_id",
+      as: "reviews",
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
+    });
   };
 
   return Product;

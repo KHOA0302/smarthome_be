@@ -12,6 +12,7 @@ const productRouter = require("./routes/product");
 const attributeRouter = require("./routes/attribute");
 const cartRouter = require("./routes/cart");
 const orderRouter = require("./routes/order");
+const reviewrouter = require("./routes/review");
 
 const cors = require("cors");
 
@@ -28,10 +29,6 @@ app.use("/product", productRouter);
 app.use("/attribute", attributeRouter);
 app.use("/cart", cartRouter);
 app.use("/order", orderRouter);
-
-///////////////////////////////////////////////
-const webhookRouter = require("./routes/webhook");
-app.use("/webhook", webhookRouter);
-///////////////////////////////////////////////
+app.use("/review", reviewrouter);
 
 module.exports = app;

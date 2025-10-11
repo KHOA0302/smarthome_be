@@ -95,6 +95,12 @@ module.exports = (sequelize, Sequelize) => {
       foreignKey: "user_id",
       as: "product_events",
     });
+    User.hasMany(db.Review, {
+      foreignKey: "user_id",
+      as: "reviews",
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
+    });
   };
 
   return User;

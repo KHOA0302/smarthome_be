@@ -48,6 +48,13 @@ module.exports = (sequelize, Sequelize) => {
       foreignKey: "order_item_id",
       as: "orderItemServices",
     });
+
+    OrderItem.hasOne(db.Review, {
+      foreignKey: "order_item_id",
+      as: "reviews",
+      onDelete: "SET NULL",
+      onUpdate: "CASCADE",
+    });
   };
 
   return OrderItem;

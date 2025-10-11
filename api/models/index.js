@@ -69,6 +69,9 @@ db.OrderItemService = require("./OrderItemService.js")(sequelize, Sequelize);
 //=============================================================//
 db.ProductEvent = require("./ProductEvent.js")(sequelize, Sequelize);
 
+//=============================================================//
+db.Review = require("./Review.js")(sequelize, Sequelize);
+
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {
     db[modelName].associate(db);

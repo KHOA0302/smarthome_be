@@ -246,7 +246,12 @@ const getOrderCustomer = async (req, res) => {
             {
               model: db.ProductVariant,
               as: "productVariant",
-              attributes: ["variant_name", "image_url"],
+              attributes: [
+                "product_id",
+                "variant_id",
+                "variant_name",
+                "image_url",
+              ],
             },
             {
               model: OrderItemService,
@@ -265,6 +270,11 @@ const getOrderCustomer = async (req, res) => {
                 },
               ],
             },
+            {
+              model: db.Review,
+              as: "reviews",
+              attributes: ["review_id", "rating", "comment_text", "created_at"],
+            },
           ],
         },
       ],
@@ -278,6 +288,10 @@ const getOrderCustomer = async (req, res) => {
     const transformedOrders = orders.map((order) => {
       const orderJson = order.toJSON();
       const orderItems = orderJson.orderItems.map((item) => {
+        const variantId = item.variant_id;
+        const productId = item.productVariant
+          ? item.productVariant.product_id
+          : null;
         const variantName = item.productVariant
           ? item.productVariant.variant_name
           : null;
@@ -296,6 +310,8 @@ const getOrderCustomer = async (req, res) => {
 
         return {
           ...item,
+          variant_id: variantId,
+          product_id: productId,
           variant_name: variantName,
           image_url: imageUrl,
           orderItemServices,
