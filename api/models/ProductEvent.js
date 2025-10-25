@@ -10,11 +10,10 @@ module.exports = (sequelize, Sequelize) => {
       },
       event_time: {
         type: Sequelize.DATE,
-        allowNull: true,
       },
       user_id: {
         type: Sequelize.INTEGER,
-        allowNull: true,
+
         references: {
           model: "users",
           key: "user_id",
@@ -22,7 +21,6 @@ module.exports = (sequelize, Sequelize) => {
       },
       session_id: {
         type: Sequelize.STRING(255),
-        allowNull: true,
       },
       event_type: {
         type: Sequelize.ENUM("view", "add_to_cart"),
@@ -30,7 +28,6 @@ module.exports = (sequelize, Sequelize) => {
       },
       variant_id: {
         type: Sequelize.INTEGER,
-        allowNull: true,
         references: {
           model: "productvariants",
           key: "variant_id",
@@ -43,19 +40,20 @@ module.exports = (sequelize, Sequelize) => {
       },
       price_at_event: {
         type: Sequelize.DECIMAL(12, 2),
-        allowNull: true,
+      },
+      click_counting: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 1,
       },
       referrer: {
         type: Sequelize.STRING(255),
-        allowNull: true,
       },
       utm_source: {
         type: Sequelize.STRING(100),
-        allowNull: true,
       },
       utm_medium: {
         type: Sequelize.STRING(100),
-        allowNull: true,
       },
       created_at: {
         type: Sequelize.DATE,

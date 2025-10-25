@@ -695,6 +695,7 @@ const getProductVariantDetails = async (req, res) => {
       user_id: req.user ? req.user.id : null,
       session_id: req.sessionId || null,
       price_at_event: parseFloat(selectedVariant.price),
+      click_counting: 1,
     };
 
     eventQueueService.pushEventToQueue("view", trackingData).catch((error) => {
