@@ -1,4 +1,6 @@
 const db = require("../models");
+const eventQueueService = require("../services/eventQueueService");
+const { Op } = db.Sequelize;
 const {
   Cart,
   CartItem,
@@ -24,8 +26,6 @@ const getCartItem = async (req, res) => {
         .status(400)
         .json({ message: "Không tìm thấy thông tin giỏ hàng." });
     }
-
-    console.log(cartIdentifier);
 
     const cart = await Cart.findOne({
       where: cartIdentifier,
@@ -172,6 +172,8 @@ const createCartItem = async (req, res) => {
       return res.status(404).json({ message: "Product variant not found." });
     }
 
+    let click_counting = 1;
+
     const existingVariantItemsInCart = await db.CartItem.findAll({
       where: {
         cart_id: cart.cart_id,
@@ -201,6 +203,8 @@ const createCartItem = async (req, res) => {
             productVariant.stock_quantity - totalCurrentQuantityInCart
           } sản phẩm có thể thêm.`,
       });
+    } else {
+      click_counting = totalCurrentQuantityInCart + quantityToAdd;
     }
 
     let cartItemPrice = parseFloat(variant.price);
@@ -251,7 +255,6 @@ const createCartItem = async (req, res) => {
 
     if (existingCartItem) {
       const newQuantity = existingCartItem.quantity + quantityToAdd;
-
       createdOrUpdatedCartItem = await existingCartItem.update(
         {
           quantity: newQuantity,
@@ -259,7 +262,6 @@ const createCartItem = async (req, res) => {
         },
         { transaction: t }
       );
-      console.log("Updated CartItem:", createdOrUpdatedCartItem.toJSON());
     } else {
       createdOrUpdatedCartItem = await db.CartItem.create(
         {
@@ -270,7 +272,6 @@ const createCartItem = async (req, res) => {
         },
         { transaction: t }
       );
-      console.log("Created new CartItem:", createdOrUpdatedCartItem.toJSON());
 
       if (selectedServiceItems.length > 0) {
         const cartItemServicesToCreate = selectedServiceItems.map((item) => ({
@@ -282,14 +283,35 @@ const createCartItem = async (req, res) => {
         await db.CartItemService.bulkCreate(cartItemServicesToCreate, {
           transaction: t,
         });
-        console.log(
-          "Created CartItemService entries for new CartItem:",
-          cartItemServicesToCreate
-        );
       }
     }
 
+    // const trackingData = {
+    //   event_type: "add_to_cart",
+    //   variant_id: parseInt(variant.variantId),
+    //   user_id: userId,
+    //   session_id: sessionId,
+    //   price_at_event: parseFloat(variant.price),
+    //   click_counting: createdOrUpdatedCartItem.quantity,
+    // };
+
+    // eventQueueService.pushEventToQueue("view", trackingData).catch((error) => {
+    //   console.error(
+    //     "[Tracking Error] Không thể push vào Queue:",
+    //     error.message
+    //   );
+    // });
+
     await t.commit();
+
+    handldeTrackingEvent(
+      variant.variantId,
+      userId,
+      sessionId,
+      variant.price,
+      click_counting
+    );
+
     return res.status(200).json({
       message: "Cart item processed successfully",
       cartItem: createdOrUpdatedCartItem,
@@ -364,19 +386,25 @@ const increaseItem = async (req, res) => {
         cart_id: cartItemToUpdate.cart_id,
         variant_id: variant_id,
       },
-    });+
-
-    console.log(totalQuantity, ">", stockQuantity);
+    });
 
     if (totalQuantity + 1 > stockQuantity) {
-      console.log("vẫn lỗi");
       return res.status(400).send({
         message: `Số lượng sản phẩm vượt quá tồn kho. Tồn kho hiện tại: ${stockQuantity}`,
       });
     }
 
     cartItemToUpdate.quantity += 1;
+
     await cartItemToUpdate.save();
+
+    handldeTrackingEvent(
+      cartItemToUpdate.variant_id,
+      req.user.id,
+      req.sessionId,
+      cartItemToUpdate.price,
+      cartItemToUpdate.quantity
+    );
 
     return res.status(200).send(cartItemToUpdate);
   } catch (error) {
@@ -415,6 +443,29 @@ const deleteItem = async (req, res) => {
     console.error("Error deleting cart item:", error);
     return res.status(500).send({ message: "Internal server error." });
   }
+};
+
+const handldeTrackingEvent = (
+  variantId,
+  userId,
+  sessionId,
+  price,
+  counting_number
+) => {
+  const trackingData = {
+    event_type: "add_to_cart",
+    variant_id: parseInt(variantId),
+    user_id: userId || null,
+    session_id: sessionId || null,
+    price_at_event: parseInt(price),
+    click_counting: counting_number,
+  };
+
+  eventQueueService.pushEventToQueue("view", trackingData).catch((error) => {
+    console.error("[Tracking Error] Không thể push vào Queue:", error.message);
+  });
+
+  console.log("seccess");
 };
 
 module.exports = {

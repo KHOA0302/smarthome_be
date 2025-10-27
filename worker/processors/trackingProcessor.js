@@ -12,52 +12,47 @@ async function processTrackingEvent(eventDataString) {
       event_type,
       session_id,
       event_time,
+      click_counting,
       ...otherFields
     } = eventData;
 
-    let truncatedEventTime = event_time
-      ? event_time.substring(0, 10)
-      : new Date().toISOString().substring(0, 10);
+    const [eventRecord, created] = await ProductEvent.findOrCreate({
+      where: {
+        user_id: user_id,
+        variant_id: variant_id,
+        event_type: event_type,
+      },
+      defaults: {
+        ...otherFields,
+        user_id: user_id,
+        variant_id: variant_id,
+        session_id: session_id,
+        event_type: event_type,
+        event_time: event_time,
+        click_counting: click_counting,
+      },
+    });
 
-    const eventDate = new Date(truncatedEventTime);
+    if (!created) {
+      let newClickCount = 1;
 
-    console.log(eventDate);
-
-    if (user_id && variant_id) {
-      const [eventRecord, created] = await ProductEvent.findOrCreate({
-        where: {
-          user_id: user_id,
-          variant_id: variant_id,
-        },
-        defaults: {
-          ...otherFields,
-          user_id: user_id,
-          variant_id: variant_id,
-          session_id: session_id,
-          event_type: event_type || "default_event",
-          event_time: eventDate,
-        },
-      });
-
-      if (!created) {
-        const newClickCount = eventRecord.click_counting + 1;
-
-        await ProductEvent.update(
-          {
-            click_counting: newClickCount,
-            event_time: otherFields.event_time || new Date(),
-            session_id: session_id,
-            event_type: event_type || eventRecord.event_type,
-          },
-          {
-            where: {
-              event_id: eventRecord.event_id,
-            },
-          }
-        );
+      if (event_type === "view") {
+        newClickCount = eventRecord.click_counting + 1;
+      } else if (event_type === "add_to_cart") {
+        newClickCount = click_counting;
       }
-    } else {
-      await ProductEvent.create(eventData);
+
+      await ProductEvent.update(
+        {
+          click_counting: newClickCount,
+          event_time: event_time,
+        },
+        {
+          where: {
+            event_id: eventRecord.event_id,
+          },
+        }
+      );
     }
   } catch (error) {
     console.error(
