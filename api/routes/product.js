@@ -72,10 +72,13 @@ router.get("/get-top-sale/:limit", productController.getTopSaleVariants);
 router.get("/get-latest-product/:limit", productController.getLatestProducts);
 router.post("/get-product-by-filter", productController.getPageProductByfilter);
 
-/////////////////////////////////////////////////////////////
-router.post("/search", productController.searchProductByName);
+router.get("/chatbot-asking-product", productController.chatbotAskingProduct);
 
-router.get("/short-details/:product", productController.getProductShortDetails);
-/////////////////////////////////////////////////////////////////////////
+router.get(
+  "/prediction",
+  protect,
+  authorize("admin"),
+  productController.getProductPrediction
+);
 
 module.exports = router;

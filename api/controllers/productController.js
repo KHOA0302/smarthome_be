@@ -24,6 +24,7 @@ const {
 } = db;
 const { Op } = db.Sequelize;
 const { deleteImageFromFirebase } = require("../utils/firebase");
+const getPredictedProductDetails = require("../services/productService/getPredictedVariant");
 
 const createProductWithDetails = async (req, res) => {
   const { basic, options, variants, services, attributes } = req.body;
@@ -698,12 +699,14 @@ const getProductVariantDetails = async (req, res) => {
       click_counting: 1,
     };
 
-    eventQueueService.pushEventToQueue("view", trackingData).catch((error) => {
-      console.error(
-        "[Tracking Error] Không thể push vào Queue:",
-        error.message
-      );
-    });
+    eventQueueService
+      .pushEventToQueue("PRODUCT_TRACKING", trackingData)
+      .catch((error) => {
+        console.error(
+          "[Tracking Error] Không thể push vào Queue:",
+          error.message
+        );
+      });
   } catch (error) {
     console.error("Error fetching product details:", error);
     res
@@ -1598,102 +1601,158 @@ const searchTopProducts = async (req, res) => {
   }
 };
 
-////////////////////////////////////////////////////////////////////////////
-const res = require("express/lib/response");
+const chatbotAskingProduct = async (req, res) => {
+  const categoryQuery = req.query.category;
+  const optionQuery = req.query.option;
+  const brandQuery = req.query.brand;
 
-const searchProductByName = async (req, res) => {
-  try {
-    const { name } = req.body; // hoặc req.query nếu GET
-
-    if (!name) {
-      return res.status(400).json({ message: "Tên sản phẩm là bắt buộc." });
-    }
-
-    const products = await Product.findAll({
-      where: {
-        product_name: { [Op.like]: `%${name}%` },
-      },
-      include: [
-        {
-          model: ProductVariant,
-          as: "variants",
-          attributes: ["variant_id", "price"], // ✅ lấy giá ở đây
-          limit: 1, // nếu bạn chỉ muốn 1 giá đại diện
-        },
-      ],
-      attributes: ["product_id", "product_name"], // ❌ bỏ 'price' vì không có
-    });
-
-    if (!products || products.length === 0) {
-      return res.status(404).json({ message: "Hiện không có sản phẩm." });
-    }
-
-    // Nếu bạn muốn trả về giá đại diện từ variant đầu tiên
-    const mappedProducts = products.map((p) => {
-      const json = p.toJSON();
-      return {
-        product_id: json.product_id,
-        product_name: json.product_name,
-        price: json.variants.length > 0 ? json.variants[0].price : null, // ✅
-      };
-    });
-
-    return res.status(200).json(mappedProducts);
-  } catch (error) {
-    console.error("Error searching product:", error);
-    return res
-      .status(500)
-      .json({ message: "Lỗi khi tìm sản phẩm.", error: error.message });
-  }
-};
-
-const getProductShortDetails = async (req, res) => {
-  const { productId } = req.params;
-
-  if (!productId) {
-    return res.status(404).json({ message: "Product ID is required." });
-  }
+  let categoryId = null;
+  let brandId = null;
+  let optionValueId = null;
 
   try {
-    const productData = await Product.findOne({
-      where: { product_id: productId },
-      attributes: ["product_id", "product_name", "price"],
+    const [categoryResult, brandResult] = await Promise.all([
+      categoryQuery
+        ? db.Category.findOne({
+            where: { category_name: { [Op.like]: categoryQuery } },
+            attributes: ["category_id"],
+          })
+        : null,
+      brandQuery && brandQuery !== "null"
+        ? db.Brand.findOne({
+            where: { brand_name: { [Op.like]: brandQuery } },
+            attributes: ["brand_id"],
+          })
+        : null,
+    ]);
 
-      include: [
-        {
-          model: ProductVariant,
-          as: "variants",
-          attributes: ["price"],
-          required: false,
-        },
-      ],
-    });
-
-    if (!productData) {
-      return res.status(404).json({ message: "Product not found." });
+    if (categoryQuery && !categoryResult) {
+      return res.status(404).json({
+        message: `Xin lỗi. Tôi không tìm thấy sản phẩm nào liên quan đến ${categoryQuery} 🥹🥹`,
+      });
+    }
+    if (categoryResult) {
+      categoryId = categoryResult.category_id;
     }
 
-    const product = productData.toJSON();
+    if (brandResult) {
+      brandId = brandResult.brand_id;
+    }
 
-    const price =
-      product.price ??
-      (product.variants && product.variants.length > 0
-        ? product.variants[0].price
-        : null);
+    if (optionQuery && categoryId) {
+      const optionValueResult = await db.OptionValue.findOne({
+        where: { option_value_name: { [Op.like]: `%${optionQuery}%` } },
+        attributes: ["option_value_id"],
+        include: [
+          {
+            model: db.Option,
+            as: "option",
+            where: { category_id: categoryId },
+            required: true,
+          },
+        ],
+      });
+
+      if (optionValueResult) {
+        optionValueId = optionValueResult.option_value_id;
+      }
+    }
+
+    const productWhere = {};
+    if (categoryId) productWhere.category_id = categoryId;
+    if (brandId) productWhere.brand_id = brandId;
+
+    const variantInclude = [];
+    if (optionValueId) {
+      variantInclude.push({
+        model: db.VariantOptionSelection,
+        as: "variantOptionSelections",
+        where: { option_value_id: optionValueId },
+        required: true,
+      });
+    }
+
+    const productVariants = await db.ProductVariant.findAll({
+      subQuery: false,
+      limit: 5,
+      include: [
+        ...variantInclude,
+        {
+          model: db.Product,
+          as: "product",
+          where: productWhere,
+          required: true,
+          attributes: ["product_name", "product_id", "brand_id", "sale_volume"],
+          include: [
+            {
+              model: db.Brand,
+              as: "brand",
+              attributes: ["brand_name"],
+              required: false,
+            },
+          ],
+        },
+      ],
+      where: { item_status: { [Op.not]: "removed" } },
+      attributes: [
+        "variant_id",
+        "variant_name",
+        "price",
+        "stock_quantity",
+        "image_url",
+      ],
+      order: [["price", "ASC"]],
+    });
+
+    if (productVariants.length === 0) {
+      return res.status(200).json({
+        message: "Xin lỗi. Bot không tìm được sản phẩm bạn yêu cầu 🥹🥹",
+        product: [],
+      });
+    }
 
     return res.status(200).json({
-      name: product.product_name,
-      price: price,
+      message: "Đây là các sản phẩm gần với yêu cầu của bạn nhất 😘😘",
+      product: productVariants,
     });
   } catch (error) {
-    console.error("Error fetching product details:", error);
-    return res.status(500).json({
-      message: "An error occurred while retrieving product details.",
-      error: error.message,
-    });
+    console.error("Lỗi trong chatbotAskingProduct (Tối ưu):", error);
+    return res
+      .status(500)
+      .json({ message: "Đã xảy ra lỗi nội bộ máy chủ.", error: error.message });
   }
 };
-////////////////////////////////////////////////////////////////////////////
+
+const getProductPrediction = async (req, res) => {
+  try {
+    const predictionData = await getAllVariantIds();
+    const predictedVariantIds = predictionData.map((item) => item.variant_id);
+    const finalResult = await getPredictedProductDetails(
+      predictedVariantIds,
+      predictionData
+    );
+    res.status(200).send(finalResult);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+};
+
+async function getAllVariantIds() {
+  try {
+    const variants = await ProductVariant.findAll({
+      attributes: ["variant_id"],
+      raw: true,
+    });
+
+    const variantIds = variants.map((variant, id) => {
+      return { variant_id: variant.variant_id, stemp: id };
+    });
+
+    return variantIds;
+  } catch (error) {
+    throw new Error("Không thể truy vấn Variant IDs từ cơ sở dữ liệu.");
+  }
+}
 
 module.exports = {
   createProductWithDetails,
@@ -1709,7 +1768,6 @@ module.exports = {
   getPageProductByfilter,
   editProductBasicInfo,
   searchTopProducts,
-  ////////////////////////
-  searchProductByName,
-  getProductShortDetails,
+  chatbotAskingProduct,
+  getProductPrediction,
 };

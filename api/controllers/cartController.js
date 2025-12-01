@@ -286,22 +286,6 @@ const createCartItem = async (req, res) => {
       }
     }
 
-    // const trackingData = {
-    //   event_type: "add_to_cart",
-    //   variant_id: parseInt(variant.variantId),
-    //   user_id: userId,
-    //   session_id: sessionId,
-    //   price_at_event: parseFloat(variant.price),
-    //   click_counting: createdOrUpdatedCartItem.quantity,
-    // };
-
-    // eventQueueService.pushEventToQueue("view", trackingData).catch((error) => {
-    //   console.error(
-    //     "[Tracking Error] Không thể push vào Queue:",
-    //     error.message
-    //   );
-    // });
-
     await t.commit();
 
     handldeTrackingEvent(
@@ -357,6 +341,8 @@ const increaseItem = async (req, res) => {
     cartIdentifier = { user_id: req.user.id };
   }
 
+  console.log(cartIdentifier);
+
   try {
     const cartItemToUpdate = await db.CartItem.findByPk(cartItemId, {
       include: [
@@ -400,7 +386,7 @@ const increaseItem = async (req, res) => {
 
     handldeTrackingEvent(
       cartItemToUpdate.variant_id,
-      req.user.id,
+      req.user?.id,
       req.sessionId,
       cartItemToUpdate.price,
       cartItemToUpdate.quantity
@@ -461,9 +447,14 @@ const handldeTrackingEvent = (
     click_counting: counting_number,
   };
 
-  eventQueueService.pushEventToQueue("view", trackingData).catch((error) => {
-    console.error("[Tracking Error] Không thể push vào Queue:", error.message);
-  });
+  eventQueueService
+    .pushEventToQueue("PRODUCT_TRACKING", trackingData)
+    .catch((error) => {
+      console.error(
+        "[Tracking Error] Không thể push vào Queue:",
+        error.message
+      );
+    });
 
   console.log("seccess");
 };

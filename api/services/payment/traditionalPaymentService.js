@@ -1,25 +1,28 @@
 const db = require("../../models");
+const eventQueueService = require("../eventQueueService");
+const { CartItem, CartItemService, PackageServiceItem, ProductVariant, Order } =
+  db;
 
 const createTraditionalOrder = async (orderData) => {
   const result = await db.sequelize.transaction(async (t) => {
     const cart = await db.Cart.findByPk(orderData.cartId, {
       include: [
         {
-          model: db.CartItem,
+          model: CartItem,
           as: "cartItems",
           include: [
             {
-              model: db.CartItemService,
+              model: CartItemService,
               as: "cartItemServices",
               include: [
                 {
-                  model: db.PackageServiceItem,
+                  model: PackageServiceItem,
                   as: "packageServiceItem",
                 },
               ],
             },
             {
-              model: db.ProductVariant,
+              model: ProductVariant,
               as: "productVariant",
             },
           ],
@@ -31,8 +34,7 @@ const createTraditionalOrder = async (orderData) => {
     if (!cart) {
       throw new Error("Cart not found.");
     }
-
-    console.log("Cart fetched:", JSON.stringify(cart, null, 2));
+    const variantsToAlert = [];
 
     const aggregatedQuantities = {};
     for (const cartItem of cart.cartItems) {
@@ -41,8 +43,6 @@ const createTraditionalOrder = async (orderData) => {
         (aggregatedQuantities[variant_id] || 0) + quantity;
     }
 
-    console.log("Aggregated Quantities:", aggregatedQuantities);
-
     const variantIds = Object.keys(aggregatedQuantities);
     const variants = await db.ProductVariant.findAll({
       where: { variant_id: variantIds },
@@ -50,14 +50,10 @@ const createTraditionalOrder = async (orderData) => {
       transaction: t,
     });
 
-    console.log("Variants with stock:", JSON.stringify(variants, null, 2));
-
     const outOfStockItems = variants.filter(
       (variant) =>
         variant.stock_quantity < aggregatedQuantities[variant.variant_id]
     );
-
-    console.log("Out of stock items:", outOfStockItems);
 
     if (outOfStockItems.length > 0) {
       const errorMsg = outOfStockItems
@@ -72,17 +68,17 @@ const createTraditionalOrder = async (orderData) => {
     }
 
     for (const variant of variants) {
-      const oldStock = variant.stock_quantity;
-      const quantityToSubtract = aggregatedQuantities[variant.variant_id];
-      console.log(
-        `Updating stock for variant ${
-          variant.variant_id
-        }: Old=${oldStock}, Subtract=${quantityToSubtract}, New=${
-          oldStock - quantityToSubtract
-        }`
-      );
       variant.stock_quantity -= aggregatedQuantities[variant.variant_id];
       await variant.save({ transaction: t });
+
+      if (variant.stock_quantity === 0) {
+        variantsToAlert.push({
+          variant_id: variant.variant_id,
+          product_id: variant.product_id,
+          variant_name: variant.variant_name,
+          image_url: variant.image_url,
+        });
+      }
     }
 
     let orderTotal = 0;
@@ -91,11 +87,6 @@ const createTraditionalOrder = async (orderData) => {
     const newOrderItemServicesPayload = [];
 
     for (const cartItem of cart.cartItems) {
-      const servicesTotalPrice = cartItem.cartItemServices.reduce(
-        (sum, service) => sum + parseFloat(service.price),
-        0
-      );
-
       const cartItemTotalPrice = parseFloat(cartItem.price) * cartItem.quantity;
 
       orderTotal += cartItemTotalPrice;
@@ -109,8 +100,7 @@ const createTraditionalOrder = async (orderData) => {
       newOrderItemsPayload.push(orderItemPayload);
     }
 
-    console.log(orderData.guestInfo);
-    const newOrder = await db.Order.create(
+    const newOrder = await Order.create(
       {
         user_id: cart.user_id,
         ...orderData.guestInfo,
@@ -156,6 +146,19 @@ const createTraditionalOrder = async (orderData) => {
 
     return newOrder;
   });
+
+  if (variantsToAlert.length > 0) {
+    variantsToAlert.forEach((singleVariantData) => {
+      eventQueueService
+        .pushEventToQueue("INVENTORY_ALERT", singleVariantData)
+        .catch((error) => {
+          console.error(
+            `[Inventory Alert Error] Can't push ${singleVariantData.variant_id} into Queue:`,
+            error.message
+          );
+        });
+    });
+  }
 
   return result;
 };

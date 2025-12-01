@@ -4,8 +4,6 @@ const { ProductEvent } = db;
 
 async function processTrackingEvent(eventDataString) {
   try {
-    const eventData = JSON.parse(eventDataString);
-
     const {
       user_id,
       variant_id,
@@ -14,7 +12,7 @@ async function processTrackingEvent(eventDataString) {
       event_time,
       click_counting,
       ...otherFields
-    } = eventData;
+    } = eventDataString;
 
     const [eventRecord, created] = await ProductEvent.findOrCreate({
       where: {

@@ -1,4 +1,5 @@
 const db = require("../models");
+const { Op, Sequelize } = require("sequelize");
 const {
   Cart,
   Order,
@@ -10,13 +11,14 @@ const {
   Product,
 } = db;
 
-const { VNPay, dateFormat } = require("vnpay");
+const { VNPay } = require("vnpay");
 
 const {
   createTraditionalOrder,
 } = require("../services/payment/traditionalPaymentService");
 const { createVnpayOrder } = require("../services/payment/vnpayPaymentService");
 const { getRevenueByYearAndQuarter } = require("../services/orderService");
+const { query } = require("firebase/firestore");
 
 const paymentStrategies = {
   traditional: createTraditionalOrder,
@@ -282,7 +284,7 @@ const getOrderCustomer = async (req, res) => {
     });
 
     if (!orders || orders.length === 0) {
-      return res.status(404).json([]);
+      return res.status(204).json([]);
     }
 
     const transformedOrders = orders.map((order) => {
@@ -330,6 +332,41 @@ const getOrderCustomer = async (req, res) => {
     console.error("Lỗi khi lấy đơn hàng:", error);
     return res.status(500).json({ message: "Lỗi máy chủ nội bộ." });
   }
+};
+
+const chatbotAskingOrder = async (req, res) => {
+  const rawStatus = req.query.status;
+  const orderStatus = rawStatus ? rawStatus.split(",") : [];
+
+  let orderIdentifier;
+
+  if (req.isGuest) {
+    orderIdentifier = { session_id: req.sessionId };
+  } else {
+    orderIdentifier = { user_id: req.user.id };
+  }
+
+  const whereCondition = {
+    ...orderIdentifier,
+  };
+
+  if (orderStatus.length > 0) {
+    whereCondition.order_status = {
+      [Op.in]: orderStatus,
+    };
+  }
+
+  const orderSummary = await Order.findAll({
+    where: whereCondition,
+    attributes: [
+      "order_status",
+      [Sequelize.fn("COUNT", Sequelize.col("order_status")), "count"],
+    ],
+    group: ["order_status"],
+    raw: true,
+  });
+
+  return res.status(200).json(orderSummary);
 };
 
 const editOrderStatus = async (req, res) => {
@@ -475,4 +512,5 @@ module.exports = {
   getOrderQuarterlyRevenue,
   editOrderStatus,
   checkVNPay,
+  chatbotAskingOrder,
 };

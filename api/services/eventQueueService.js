@@ -1,11 +1,11 @@
 const redisClient = require("../config/redis.config");
 
-const QUEUE_NAME = "PRODUCT_TRACKING_QUEUE";
+const QUEUE_NAME = "MAIN_WORKER_QUEUE";
 
-async function pushEventToQueue(eventType, data) {
+async function pushEventToQueue(processingType, data) {
   const eventRecord = {
     event_time: new Date().toISOString(),
-    event_type: eventType,
+    processingType,
     ...data,
   };
 

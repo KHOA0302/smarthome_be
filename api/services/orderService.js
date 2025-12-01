@@ -4,11 +4,6 @@ const { Op } = require("sequelize");
 
 const Sequelize = db.Sequelize;
 
-/**
- * @param {number} year
- * @returns {Promise<Array<Object>>}
- */
-
 const getQuarterlyCategorySales = (orders, quarters) => {
   const quarterlyCategorySales = {};
   const totalQuantitySoldPerQuarter = {};
@@ -54,12 +49,6 @@ const getQuarterlyCategorySales = (orders, quarters) => {
 
   return { quarterlyCategorySales, totalQuantitySoldPerQuarter };
 };
-
-/**
- * @param {number} [startYear]
- * @param {number} [endYear]
- * @returns {Promise<Array<Object>>}
- */
 
 const getRevenueByYearAndQuarter = async (startYear, endYear) => {
   try {

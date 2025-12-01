@@ -92,6 +92,10 @@ module.exports = (sequelize, Sequelize) => {
       foreignKey: "variant_id",
       as: "product_events",
     });
+    ProductVariant.hasMany(db.OutOfStockNotify, {
+      foreignKey: "variant_id",
+      as: "outOfStockAlerts",
+    });
   };
 
   return ProductVariant;

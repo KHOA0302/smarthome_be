@@ -20,6 +20,12 @@ router.post(
 );
 
 router.get(
+  "/chatbot-asking-order",
+  identifyUserOrGuest,
+  orderController.chatbotAskingOrder
+);
+
+router.get(
   "/get-quarterly-revenue",
   protect,
   authorize("admin"),
