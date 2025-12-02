@@ -1724,12 +1724,14 @@ const chatbotAskingProduct = async (req, res) => {
 };
 
 const getProductPrediction = async (req, res) => {
+  const { brand, category, status } = req.query;
   try {
     const predictionData = await getAllVariantIds();
     const predictedVariantIds = predictionData.map((item) => item.variant_id);
     const finalResult = await getPredictedProductDetails(
       predictedVariantIds,
-      predictionData
+      predictionData,
+      { brand, category, status }
     );
     res.status(200).send(finalResult);
   } catch (error) {
@@ -1745,7 +1747,15 @@ async function getAllVariantIds() {
     });
 
     const variantIds = variants.map((variant, id) => {
-      return { variant_id: variant.variant_id, stemp: id };
+      const min = 1;
+      const max = 5;
+
+      let randomNumber = Math.random() * (max - min) + min;
+
+      return {
+        variant_id: variant.variant_id,
+        stemp: parseFloat(randomNumber.toFixed(3)),
+      };
     });
 
     return variantIds;
