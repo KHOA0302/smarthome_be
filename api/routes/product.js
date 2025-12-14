@@ -81,4 +81,11 @@ router.get(
   productController.getProductPrediction
 );
 
+router.put(
+  "/edit-product-visibility",
+  protect,
+  authorize("admin"),
+  productController.editProductVisibility
+);
+
 module.exports = router;

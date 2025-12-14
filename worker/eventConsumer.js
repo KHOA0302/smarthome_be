@@ -14,7 +14,6 @@ async function startWorker() {
 
       try {
         const job = JSON.parse(eventDataString);
-
         switch (job.processingType) {
           case "PRODUCT_TRACKING":
             await processTrackingEvent(job);

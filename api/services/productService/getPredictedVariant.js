@@ -61,7 +61,9 @@ async function getPredictedProductDetails(variantIds, predictionData, filter) {
     return {
       ...variantData,
 
-      stemp: prediction ? prediction.stemp : 0,
+      predicted_order_next_quarter: prediction
+        ? prediction.predicted_order_next_quarter
+        : 0,
     };
   });
 

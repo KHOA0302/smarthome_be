@@ -1725,6 +1725,7 @@ const chatbotAskingProduct = async (req, res) => {
 
 const getProductPrediction = async (req, res) => {
   const { brand, category, status } = req.query;
+  let productToMess;
   try {
     const predictionData = await getAllVariantIds();
     const predictedVariantIds = predictionData.map((item) => item.variant_id);
@@ -1733,36 +1734,45 @@ const getProductPrediction = async (req, res) => {
       predictionData,
       { brand, category, status }
     );
+    productToMess = finalResult;
     res.status(200).send(finalResult);
   } catch (error) {
     res.status(500).send(error.message);
   }
+  productToMess.map((variant, id) =>
+    eventQueueService.pushEventToQueue("INVENTORY_ALERT", variant)
+  );
 };
 
 async function getAllVariantIds() {
+  const url = "http://localhost:8000/api/predict";
+
   try {
-    const variants = await ProductVariant.findAll({
-      attributes: ["variant_id"],
-      raw: true,
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
     });
 
-    const variantIds = variants.map((variant, id) => {
-      const min = 1;
-      const max = 5;
+    if (!response.ok) {
+      throw new Error(`Lỗi HTTP! Status: ${response.status}`);
+    }
 
-      let randomNumber = Math.random() * (max - min) + min;
+    const data = await response.json();
 
-      return {
-        variant_id: variant.variant_id,
-        stemp: parseFloat(randomNumber.toFixed(3)),
-      };
-    });
-
-    return variantIds;
+    return data;
   } catch (error) {
-    throw new Error("Không thể truy vấn Variant IDs từ cơ sở dữ liệu.");
+    console.error("Đã xảy ra lỗi khi fetch dữ liệu:", error.message);
+
+    return null;
   }
 }
+
+const editProductVisibility = async (req, res) => {
+  const { variantId, itemStatus } = req.body;
+  console.log(variantId, itemStatus);
+};
 
 module.exports = {
   createProductWithDetails,
@@ -1780,4 +1790,5 @@ module.exports = {
   searchTopProducts,
   chatbotAskingProduct,
   getProductPrediction,
+  editProductVisibility,
 };

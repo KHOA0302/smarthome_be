@@ -1,5 +1,5 @@
 const db = require("../models");
-const { Service, Review, Sequelize } = db;
+const { Service, Review, Sequelize, User, OrderItem, Order } = db;
 const Op = Sequelize.Op;
 
 const createReview = async (req, res) => {
@@ -31,4 +31,45 @@ const createReview = async (req, res) => {
   }
 };
 
-module.exports = { createReview };
+const getReviews = async (req, res) => {
+  const productId = req.query.productId;
+  try {
+    const reviews = await Review.findAll({
+      where: {
+        product_id: productId,
+      },
+
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["user_id", "full_name", "avatar"],
+        },
+        {
+          model: OrderItem,
+          as: "order_item",
+          attributes: ["order_item_id"],
+          include: [
+            {
+              model: Order,
+              as: "order",
+              attributes: ["updated_at"],
+            },
+          ],
+        },
+      ],
+
+      order: [["created_at", "DESC"]],
+    });
+
+    if (reviews.length === 0) {
+      return res.status(404).json([]);
+    }
+
+    return res.status(200).json(reviews);
+  } catch (error) {
+    console.error("Lỗi khi lấy đánh giá:", error);
+  }
+};
+
+module.exports = { createReview, getReviews };

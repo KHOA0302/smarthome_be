@@ -9,4 +9,6 @@ router.post(
   reviewController.createReview
 );
 
+router.get("/get-reviews", reviewController.getReviews);
+
 module.exports = router;
