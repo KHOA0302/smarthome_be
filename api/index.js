@@ -13,6 +13,7 @@ const attributeRouter = require("./routes/attribute");
 const cartRouter = require("./routes/cart");
 const orderRouter = require("./routes/order");
 const reviewrouter = require("./routes/review");
+const promotionRouter = require("./routes/promotion");
 
 const cors = require("cors");
 
@@ -30,5 +31,6 @@ app.use("/attribute", attributeRouter);
 app.use("/cart", cartRouter);
 app.use("/order", orderRouter);
 app.use("/review", reviewrouter);
+app.use("/promotion", promotionRouter);
 
 module.exports = app;

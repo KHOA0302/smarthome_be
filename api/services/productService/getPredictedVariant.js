@@ -1,5 +1,14 @@
 const db = require("../../models/index");
-const { Product, ProductVariant, Option, OptionValue, Brand, Category } = db;
+const {
+  Product,
+  ProductVariant,
+  Option,
+  OptionValue,
+  Brand,
+  Category,
+  Promotion,
+  PromotionVariant,
+} = db;
 const { Op } = require("sequelize");
 
 async function getPredictedProductDetails(variantIds, predictionData, filter) {
@@ -48,6 +57,18 @@ async function getPredictedProductDetails(variantIds, predictionData, filter) {
         attributes: ["option_value_id", "option_value_name"],
         through: { attributes: [] },
         include: [{ model: Option, as: "option", attributes: ["option_name"] }],
+      },
+      {
+        model: PromotionVariant,
+        as: "promotionVariants",
+        attributes: ["specific_discount_value"],
+        include: [
+          {
+            model: Promotion,
+            as: "promotion",
+            attributes: ["promotion_name", "discount_type", "discount_value"],
+          },
+        ],
       },
     ],
   });

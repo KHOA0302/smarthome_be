@@ -88,4 +88,11 @@ router.put(
   productController.editProductVisibility
 );
 
+router.get(
+  "/get-all-variants",
+  protect,
+  authorize("admin"),
+  productController.getAllProductVariants
+);
+
 module.exports = router;

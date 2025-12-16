@@ -75,6 +75,10 @@ db.Review = require("./Review.js")(sequelize, Sequelize);
 //============================================================//
 db.OutOfStockNotify = require("./OutOfStockNotify.js")(sequelize, Sequelize);
 
+//===============================================================//
+db.Promotion = require("./Promotion.js")(sequelize, Sequelize);
+db.PromotionVariant = require("./PromotionVariant.js")(sequelize, Sequelize);
+
 Object.keys(db).forEach((modelName) => {
   if (db[modelName].associate) {
     db[modelName].associate(db);

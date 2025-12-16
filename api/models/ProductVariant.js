@@ -96,6 +96,18 @@ module.exports = (sequelize, Sequelize) => {
       foreignKey: "variant_id",
       as: "outOfStockAlerts",
     });
+
+    ProductVariant.belongsToMany(db.Promotion, {
+      through: db.PromotionVariant,
+      foreignKey: "variant_id",
+      otherKey: "promotion_id",
+      as: "promotions",
+    });
+
+    ProductVariant.hasMany(db.PromotionVariant, {
+      foreignKey: "variant_id",
+      as: "promotionVariants",
+    });
   };
 
   return ProductVariant;

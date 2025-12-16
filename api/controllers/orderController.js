@@ -417,7 +417,7 @@ const editOrderStatus = async (req, res) => {
         }
       }
 
-      if (status === "cancelled" && currentStatus !== "pending") {
+      if (status === "cancel" && currentStatus !== "pending") {
         for (const item of order.orderItems) {
           const variant = item.productVariant;
           const newStock = variant.stock_quantity + item.quantity;

@@ -1774,6 +1774,58 @@ const editProductVisibility = async (req, res) => {
   console.log(variantId, itemStatus);
 };
 
+const getAllProductVariants = async (req, res) => {
+  try {
+    const variants = await ProductVariant.findAll({
+      include: [
+        {
+          model: Product,
+          as: "product",
+          attributes: ["product_id", "product_name"],
+          include: [
+            {
+              model: Brand,
+              as: "brand",
+              attributes: ["brand_name", "logo_url"],
+            },
+            {
+              model: Category,
+              as: "category",
+              attributes: ["category_name", "icon_url"],
+            },
+          ],
+        },
+
+        {
+          model: OptionValue,
+          as: "selectedOptionValues",
+          attributes: ["option_value_id", "option_value_name"],
+          through: { attributes: [] },
+          include: [
+            { model: Option, as: "option", attributes: ["option_name"] },
+          ],
+        },
+        {
+          model: db.PromotionVariant,
+          as: "promotionVariants",
+          attributes: ["specific_discount_value"],
+          include: [
+            {
+              model: db.Promotion,
+              as: "promotion",
+              attributes: ["promotion_name", "discount_type", "discount_value"],
+            },
+          ],
+        },
+      ],
+    });
+
+    return res.status(200).json(variants);
+  } catch (error) {
+    return res.status(500).json(error.message);
+  }
+};
+
 module.exports = {
   createProductWithDetails,
   getProductVariantDetails,
@@ -1791,4 +1843,5 @@ module.exports = {
   chatbotAskingProduct,
   getProductPrediction,
   editProductVisibility,
+  getAllProductVariants,
 };
