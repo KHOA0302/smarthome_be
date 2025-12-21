@@ -197,11 +197,7 @@ const createCartItem = async (req, res) => {
       await t.rollback();
       return res.status(400).json({
         message:
-          `Không đủ số lượng tồn kho cho sản phẩm "${productVariant.variant_name}". ` +
-          `Bạn đã có ${totalCurrentQuantityInCart} sản phẩm này trong giỏ. ` +
-          `Chỉ còn ${
-            productVariant.stock_quantity - totalCurrentQuantityInCart
-          } sản phẩm có thể thêm.`,
+          `Không đủ số lượng tồn kho cho sản phẩm "${productVariant.variant_name}".`
       });
     } else {
       click_counting = totalCurrentQuantityInCart + quantityToAdd;

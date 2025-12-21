@@ -18,7 +18,7 @@ async function startWorker() {
           case "PRODUCT_TRACKING":
             await processTrackingEvent(job);
             break;
-          case "INVENTORY_ALERT":
+          case "NEW_INVENTORY_ALERT":
             await processAlertEvent(job);
             break;
           default:

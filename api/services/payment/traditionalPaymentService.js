@@ -1,11 +1,19 @@
 const db = require("../../models");
 const eventQueueService = require("../eventQueueService");
-const { CartItem, CartItemService, PackageServiceItem, ProductVariant, Order } =
-  db;
+const {
+  CartItem,
+  CartItemService,
+  PackageServiceItem,
+  ProductVariant,
+  Order,
+  Cart,
+  sequelize,
+} = db;
 
 const createTraditionalOrder = async (orderData) => {
-  const result = await db.sequelize.transaction(async (t) => {
-    const cart = await db.Cart.findByPk(orderData.cartId, {
+  const variantsToAlert = [];
+  const result = await sequelize.transaction(async (t) => {
+    const cart = await Cart.findByPk(orderData.cartId, {
       include: [
         {
           model: CartItem,
@@ -34,7 +42,6 @@ const createTraditionalOrder = async (orderData) => {
     if (!cart) {
       throw new Error("Cart not found.");
     }
-    const variantsToAlert = [];
 
     const aggregatedQuantities = {};
     for (const cartItem of cart.cartItems) {
@@ -57,12 +64,7 @@ const createTraditionalOrder = async (orderData) => {
 
     if (outOfStockItems.length > 0) {
       const errorMsg = outOfStockItems
-        .map(
-          (item) =>
-            `Sản phẩm ${item.variant_name} không đủ hàng. Tồn kho: ${
-              item.stock_quantity
-            }, Yêu cầu: ${aggregatedQuantities[item.variant_id]}.`
-        )
+        .map((item) => `Sản phẩm ${item.variant_name} không đủ hàng.`)
         .join(" ");
       throw new Error(errorMsg);
     }
@@ -74,9 +76,6 @@ const createTraditionalOrder = async (orderData) => {
       if (variant.stock_quantity === 0) {
         variantsToAlert.push({
           variant_id: variant.variant_id,
-          product_id: variant.product_id,
-          variant_name: variant.variant_name,
-          image_url: variant.image_url,
         });
       }
     }
@@ -150,7 +149,7 @@ const createTraditionalOrder = async (orderData) => {
   if (variantsToAlert.length > 0) {
     variantsToAlert.forEach((singleVariantData) => {
       eventQueueService
-        .pushEventToQueue("INVENTORY_ALERT", singleVariantData)
+        .pushEventToQueue("NEW_INVENTORY_ALERT", singleVariantData)
         .catch((error) => {
           console.error(
             `[Inventory Alert Error] Can't push ${singleVariantData.variant_id} into Queue:`,

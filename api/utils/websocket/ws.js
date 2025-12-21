@@ -39,7 +39,14 @@ function setupRedisSubscriber() {
     if (channel === SOCKET_CHANNEL) {
       try {
         const data = JSON.parse(message);
-        notifyNewAlert(data);
+        switch (data.type) {
+          case "NEW_INVENTORY_ALERT":
+            notifyNewAlert(data);
+            break;
+
+          default:
+            break;
+        }
       } catch (e) {
         console.error("Lỗi parse JSON từ Redis PubSub:", e);
       }
@@ -53,8 +60,8 @@ function notifyNewAlert(data) {
   }
 
   const message = JSON.stringify({
-    type: "NEW_INVENTORY_ALERT",
     ...data,
+    type: "NEW_INVENTORY_ALERT",
     timestamp: new Date().toISOString(),
   });
 
@@ -65,16 +72,10 @@ function notifyNewAlert(data) {
   });
 }
 
-function notifyAlertsResolved(productId) {
+function notifyAlertsResolved(data) {
   if (!wss) {
     return;
   }
-
-  const message = JSON.stringify({
-    type: "INVENTORY_ALERT_RESOLVED",
-    productId: productId,
-    timestamp: new Date().toISOString(),
-  });
 
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {

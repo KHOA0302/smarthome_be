@@ -81,18 +81,18 @@ router.get(
   productController.getProductPrediction
 );
 
-router.put(
-  "/edit-product-visibility",
-  protect,
-  authorize("admin"),
-  productController.editProductVisibility
-);
-
 router.get(
   "/get-all-variants",
   protect,
   authorize("admin"),
   productController.getAllProductVariants
+);
+
+router.patch(
+  "/edit-status",
+  protect,
+  authorize("admin"),
+  productController.editProductStatus
 );
 
 module.exports = router;

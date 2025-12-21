@@ -368,6 +368,7 @@ const getUserInfo = async (req, res) => {
   try {
     const user = await User.findOne({
       where: { user_id: req.user.id },
+      include: [{ model: db.Role, as: "role" }],
     });
     if (!user) {
       return res.status(404).json({ message: "User not found" });

@@ -18,7 +18,6 @@ const {
 } = require("../services/payment/traditionalPaymentService");
 const { createVnpayOrder } = require("../services/payment/vnpayPaymentService");
 const { getRevenueByYearAndQuarter } = require("../services/orderService");
-const { query } = require("firebase/firestore");
 
 const paymentStrategies = {
   traditional: createTraditionalOrder,
@@ -32,7 +31,8 @@ const createOrder = async (req, res) => {
 
   try {
     const cart = await Cart.findByPk(cartId);
-    if (cart.user_id) {
+
+    if (cart && cart.user_id) {
       if (!userId || cart.user_id !== userId) {
         return res.status(401).json({
           message:
@@ -40,7 +40,7 @@ const createOrder = async (req, res) => {
         });
       }
     } else {
-      if (!sessionId || cart.session_id !== sessionId) {
+      if (!sessionId || (cart && cart.session_id !== sessionId)) {
         return res.status(401).json({
           message: "Phiên giỏ hàng không hợp lệ. Vui lòng làm mới giỏ hàng.",
         });
@@ -50,7 +50,7 @@ const createOrder = async (req, res) => {
     const createOrderFunction = paymentStrategies[method];
 
     if (!createOrderFunction) {
-      return res.status(400).json({ message: "Invalid payment method." });
+      return res.status(400).json({ message: "Lỗi tạo Đơn Hàng." });
     }
 
     const result = await createOrderFunction({
@@ -65,13 +65,16 @@ const createOrder = async (req, res) => {
       return res.status(201).json(result.order_id);
     } else if (method === "vnpay") {
       return res.status(201).json({
-        message: "Order created successfully. Redirecting to payment gateway.",
+        message: "Tạo Đơn Hàng thành công!!",
         orderId: result.newOrder.order_id,
         redirect: result.vnpayUrl,
       });
     }
   } catch (error) {
-    return res.status(400).json({ message: "Error" });
+    const errorMessage = error.message;
+    return res.status(400).json({
+      message: errorMessage || "Không thể tạo đơn hàng!!",
+    });
   }
 };
 

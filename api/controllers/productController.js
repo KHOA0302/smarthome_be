@@ -1725,7 +1725,7 @@ const chatbotAskingProduct = async (req, res) => {
 
 const getProductPrediction = async (req, res) => {
   const { brand, category, status } = req.query;
-  let productToMess;
+
   try {
     const predictionData = await getAllVariantIds();
     const predictedVariantIds = predictionData.map((item) => item.variant_id);
@@ -1734,14 +1734,11 @@ const getProductPrediction = async (req, res) => {
       predictionData,
       { brand, category, status }
     );
-    productToMess = finalResult;
+
     res.status(200).send(finalResult);
   } catch (error) {
     res.status(500).send(error.message);
   }
-  productToMess.map((variant, id) =>
-    eventQueueService.pushEventToQueue("INVENTORY_ALERT", variant)
-  );
 };
 
 async function getAllVariantIds() {
@@ -1769,19 +1766,35 @@ async function getAllVariantIds() {
   }
 }
 
-const editProductVisibility = async (req, res) => {
-  const { variantId, itemStatus } = req.body;
-  console.log(variantId, itemStatus);
-};
-
 const getAllProductVariants = async (req, res) => {
+  const { brand, category, status } = req.query;
+
+  const variantWhere = {};
+
+  if (status) {
+    variantWhere.item_status = status;
+  }
+
+  const productWhere = {};
+
+  if (brand) {
+    productWhere.brand_id = parseInt(brand);
+  }
+
+  if (category) {
+    productWhere.category_id = parseInt(category);
+  }
+
   try {
     const variants = await ProductVariant.findAll({
+      where: variantWhere,
       include: [
         {
           model: Product,
           as: "product",
           attributes: ["product_id", "product_name"],
+          where: Object.keys(productWhere).length > 0 ? productWhere : null,
+          required: Object.keys(productWhere).length > 0,
           include: [
             {
               model: Brand,
@@ -1826,6 +1839,34 @@ const getAllProductVariants = async (req, res) => {
   }
 };
 
+const editProductStatus = async (req, res) => {
+  const { variantId, status } = req.body;
+  console.log(variantId, status);
+  const newStatus = status === true ? "in_stock" : "out_of_stock";
+  try {
+    const [updatedRows] = await ProductVariant.update(
+      { item_status: newStatus },
+      {
+        where: { variant_id: variantId },
+      }
+    );
+
+    if (updatedRows === 0) {
+      return res.status(404).json({
+        message: `Không tìm thấy ProductVariant với ID: ${variantId} hoặc trạng thái không thay đổi.`,
+      });
+    }
+
+    return res.status(200).json({
+      message: `Đã cập nhật trạng thái của ProductVariant ID ${variantId} thành công thành "${newStatus}".`,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Lỗi khi cập nhật trạng thái sản phẩm.",
+    });
+  }
+};
+
 module.exports = {
   createProductWithDetails,
   getProductVariantDetails,
@@ -1842,6 +1883,6 @@ module.exports = {
   searchTopProducts,
   chatbotAskingProduct,
   getProductPrediction,
-  editProductVisibility,
   getAllProductVariants,
+  editProductStatus,
 };

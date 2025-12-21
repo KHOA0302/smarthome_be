@@ -141,6 +141,7 @@ const getRevenueByYearAndQuarter = async (startYear, endYear) => {
     let previousQuarterRevenue = null;
     let previousQuarterTotalQuantity = null;
     const currentFullDate = new Date();
+    
     const currentYear = currentFullDate.getFullYear();
     const currentMonth = currentFullDate.getMonth() + 1;
 

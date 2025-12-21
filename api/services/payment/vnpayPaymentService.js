@@ -54,53 +54,40 @@ const createVnpayOrder = async (orderData) => {
 
     if (outOfStockItems.length > 0) {
       const errorMsg = outOfStockItems
-        .map(
-          (item) =>
-            `Sản phẩm ${item.variant_name} không đủ hàng. Tồn kho: ${
-              item.stock_quantity
-            }, Yêu cầu: ${aggregatedQuantities[item.variant_id]}.`
-        )
+        .map((item) => `Sản phẩm ${item.variant_name} không đủ hàng.`)
         .join(" ");
       throw new Error(errorMsg);
     }
 
-    
     for (const variant of variants) {
       variant.stock_quantity -= aggregatedQuantities[variant.variant_id];
       await variant.save({ transaction: t });
     }
 
-   
     let orderTotal = 0;
 
-  
     const newOrderItemsPayload = [];
     const newOrderItemServicesPayload = [];
 
-    
     for (const cartItem of cart.cartItems) {
-      
       const cartItemTotalPrice = parseFloat(cartItem.price) * cartItem.quantity;
 
-      
       orderTotal += cartItemTotalPrice;
 
-      
       const orderItemPayload = {
         variant_id: cartItem.variant_id,
         quantity: cartItem.quantity,
-        price: parseFloat(cartItem.price), 
+        price: parseFloat(cartItem.price),
         total_price: cartItemTotalPrice,
       };
       newOrderItemsPayload.push(orderItemPayload);
     }
 
-    
     const newOrder = await db.Order.create(
       {
         user_id: cart.user_id,
         ...orderData.guestInfo,
-        order_total: orderTotal, 
+        order_total: orderTotal,
         payment_method: "vnpay",
         payment_status: "unpaid",
         order_status: "pending",
@@ -108,7 +95,6 @@ const createVnpayOrder = async (orderData) => {
       { transaction: t }
     );
 
-    
     const orderItemsWithOrderId = newOrderItemsPayload.map((item) => ({
       ...item,
       order_id: newOrder.order_id,
@@ -121,7 +107,6 @@ const createVnpayOrder = async (orderData) => {
       }
     );
 
-    
     for (let i = 0; i < cart.cartItems.length; i++) {
       const cartItem = cart.cartItems[i];
       const createdOrderItem = createdOrderItems[i];
@@ -148,7 +133,7 @@ const createVnpayOrder = async (orderData) => {
     const vnp_CreateDate = dateFormat(currentDate);
     const vnp_ExpireDate = dateFormat(
       new Date(currentDate.getTime() + 30 * 60 * 1000)
-    ); 
+    );
 
     const vnp_ReturnUrl = orderData.userId
       ? `http://localhost:8080/order/check-vnpay?userId=${orderData.userId}`
