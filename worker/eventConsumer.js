@@ -1,6 +1,9 @@
 const redisClient = require("../api/config/redis.config");
 const { processTrackingEvent } = require("./processors/trackingProcessor");
-const { processAlertEvent } = require("./processors/alertProcessor");
+const {
+  processAlertEvent,
+  processDeleteAlertEvent,
+} = require("./processors/alertProcessor");
 const QUEUE_NAME = "MAIN_WORKER_QUEUE";
 
 async function startWorker() {
@@ -20,6 +23,9 @@ async function startWorker() {
             break;
           case "NEW_INVENTORY_ALERT":
             await processAlertEvent(job);
+            break;
+          case "DELETE_INVENTORY_ALERT":
+            await processDeleteAlertEvent(job);
             break;
           default:
             console.warn(`[Worker] Job type không xác định: ${job.type}`);

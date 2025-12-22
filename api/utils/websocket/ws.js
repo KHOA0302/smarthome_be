@@ -43,7 +43,9 @@ function setupRedisSubscriber() {
           case "NEW_INVENTORY_ALERT":
             notifyNewAlert(data);
             break;
-
+          case "DELETE_INVENTORY_ALERT":
+            notifyAlertsResolved(data);
+            break;
           default:
             break;
         }
@@ -61,7 +63,6 @@ function notifyNewAlert(data) {
 
   const message = JSON.stringify({
     ...data,
-    type: "NEW_INVENTORY_ALERT",
     timestamp: new Date().toISOString(),
   });
 
@@ -76,6 +77,8 @@ function notifyAlertsResolved(data) {
   if (!wss) {
     return;
   }
+
+  const message = JSON.stringify(data);
 
   clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {

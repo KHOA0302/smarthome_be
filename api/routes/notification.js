@@ -10,4 +10,11 @@ router.get(
   notificationController.getNotification
 );
 
+router.delete(
+  "/delete-notification/:notificationId",
+  protect,
+  authorize("admin"),
+  notificationController.deleteNotification
+);
+
 module.exports = router;

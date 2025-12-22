@@ -1083,6 +1083,25 @@ const editVariants = async (req, res) => {
     const updatePromises = [];
     const deletePromises = [];
 
+    const variantsToAlert = []; // Mảng chứa các variant cần thông báo
+
+    // --- CODE THÊM MỚI: Lấy danh sách ID để truy vấn 1 lần duy nhất ---
+    const variantIds = variants
+      .filter((v) => typeof v.variant_id === "number" && !v.isRemove)
+      .map((v) => v.variant_id);
+
+    // Lấy tồn kho hiện tại trong DB của các variant sắp update
+    const currentVariantsInDb = await ProductVariant.findAll({
+      where: { variant_id: variantIds, product_id: productId },
+      attributes: ["variant_id", "stock_quantity"],
+      transaction: t,
+    });
+
+    // Chuyển thành Map để tìm kiếm nhanh O(1)
+    const stockMap = new Map(
+      currentVariantsInDb.map((v) => [v.variant_id, v.stock_quantity])
+    );
+
     for (const variant of variants) {
       if (variant.isRemove) {
         if (typeof variant.variant_id === "number") {
@@ -1142,6 +1161,19 @@ const editVariants = async (req, res) => {
           const cleanedPrice = parseFloat(
             String(variant.price).replace(/\./g, "")
           );
+
+          // --- CODE THÊM MỚI: Check logic "Từ 0 lên > 0" ---
+          const oldStock = stockMap.get(variant.variant_id);
+          const newStock = parseInt(variant.stock_quantity);
+
+          if (oldStock === 0 && newStock > 0) {
+            variantsToAlert.push({
+              variant_id: variant.variant_id,
+              // Có thể thêm image_url hoặc các info khác nếu queue cần
+            });
+          }
+          // --- KẾT THÚC CHECK ---
+
           updatePromises.push(
             ProductVariant.update(
               {
@@ -1168,6 +1200,22 @@ const editVariants = async (req, res) => {
     await Promise.all([...updatePromises, ...deletePromises]);
 
     await t.commit();
+
+    // --- CODE THÊM MỚI: Đẩy vào Queue sau khi Commit thành công ---
+    // Chỉ đẩy khi DB đã lưu thành công để tránh lệch dữ liệu (Eventual Consistency)
+    if (variantsToAlert.length > 0) {
+      variantsToAlert.forEach((singleVariantData) => {
+        eventQueueService
+          .pushEventToQueue("DELETE_INVENTORY_ALERT", singleVariantData)
+          .catch((error) => {
+            console.error(
+              `[Inventory Alert Error] Can't push ${singleVariantData.variant_id}:`,
+              error.message
+            );
+          });
+      });
+    }
+    // --- KẾT THÚC ĐẨY QUEUE ---
 
     return res.status(200).json({
       message: "Product variants updated successfully.",

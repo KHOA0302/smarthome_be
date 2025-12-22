@@ -1,5 +1,6 @@
 const db = require("../../models/index");
-const { Notification, ProductVariant, Product, Order, OrderItem } = db;
+const { Notification, ProductVariant, Product, Order, OrderItem, Promotion } =
+  db;
 
 const getProductVariant = async (notificationId = null) => {
   try {
@@ -23,6 +24,10 @@ const getProductVariant = async (notificationId = null) => {
               model: Product,
               as: "product",
               attributes: ["product_name"],
+            },
+            {
+              model: Promotion,
+              as: "promotions",
             },
           ],
         },
