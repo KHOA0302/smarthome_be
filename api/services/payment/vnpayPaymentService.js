@@ -155,8 +155,8 @@ const createVnpayOrder = async (orderData) => {
     });
 
     const vnpay = new VNPay({
-      tmnCode: "0TSSC1QT",
-      secureSecret: "OTYGF8UKW9QVWWTE0BTY82Z1P3LOUA47",
+      tmnCode: "HZ671ZDB", //"0TSSC1QT",
+      secureSecret: "6THKU1LUUKK7OL76SVIJBO86KD0AU1J4", //"OTYGF8UKW9QVWWTE0BTY82Z1P3LOUA47",
     });
 
     const currentDate = new Date();
