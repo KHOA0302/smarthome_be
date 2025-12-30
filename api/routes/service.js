@@ -17,7 +17,7 @@ router.post(
   serviceController.createService
 );
 
-router.put(
+router.post(
   "/update",
   protect,
   authorize("admin"),

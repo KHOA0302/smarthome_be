@@ -9,6 +9,10 @@ const {
   Option,
   OptionValue,
   Service,
+  Order,
+  User,
+  Promotion,
+  PromotionVariant,
 } = db;
 
 const getCartItem = async (req, res) => {
@@ -45,6 +49,22 @@ const getCartItem = async (req, res) => {
                     {
                       model: Option,
                       as: "option",
+                    },
+                  ],
+                },
+                {
+                  model: PromotionVariant,
+                  as: "promotionVariants",
+                  attributes: ["specific_discount_value"],
+                  include: [
+                    {
+                      model: Promotion,
+                      as: "promotion",
+                      attributes: [
+                        "promotion_name",
+                        "discount_type",
+                        "discount_value",
+                      ],
                     },
                   ],
                 },
@@ -107,10 +127,14 @@ const getCartItem = async (req, res) => {
           return {
             serviceId: packageServiceItem.serviceDefinition.service_id,
             serviceName: packageServiceItem.serviceDefinition.service_name,
-            price: cartItemService.price,
+            price: packageServiceItem.item_price_impact,
           };
         }
       );
+
+      const unitPrice = productVariant.price;
+
+      const calculatedCartItemPrice = unitPrice * cartItem.quantity;
 
       return {
         cartItemId: cartItem.cart_item_id,
@@ -118,12 +142,17 @@ const getCartItem = async (req, res) => {
           productId: productVariant.product_id,
           variantId: productVariant.variant_id,
           variantName: productVariant.variant_name,
-          price: productVariant.price,
+          price: unitPrice,
           imageUrl: productVariant.image_url,
+          promotionVariant:
+            productVariant.promotionVariants.find(
+              (promotionVariant) =>
+                promotionVariant.promotion.discount_type === "PERCENT"
+            ) || {},
         },
         options: optionsPayload,
         quantity: cartItem.quantity,
-        price: cartItem.price,
+        price: calculatedCartItemPrice,
         services: servicesPayload,
       };
     });
@@ -196,8 +225,7 @@ const createCartItem = async (req, res) => {
     ) {
       await t.rollback();
       return res.status(400).json({
-        message:
-          `Không đủ số lượng tồn kho cho sản phẩm "${productVariant.variant_name}".`
+        message: `Không đủ số lượng tồn kho cho sản phẩm "${productVariant.variant_name}".`,
       });
     } else {
       click_counting = totalCurrentQuantityInCart + quantityToAdd;
@@ -289,7 +317,8 @@ const createCartItem = async (req, res) => {
       userId,
       sessionId,
       variant.price,
-      click_counting
+      click_counting,
+      "add_to_cart"
     );
 
     return res.status(200).json({
@@ -337,8 +366,6 @@ const increaseItem = async (req, res) => {
     cartIdentifier = { user_id: req.user.id };
   }
 
-  console.log(cartIdentifier);
-
   try {
     const cartItemToUpdate = await db.CartItem.findByPk(cartItemId, {
       include: [
@@ -385,7 +412,8 @@ const increaseItem = async (req, res) => {
       req.user?.id,
       req.sessionId,
       cartItemToUpdate.price,
-      cartItemToUpdate.quantity
+      cartItemToUpdate.quantity,
+      "add_to_cart"
     );
 
     return res.status(200).send(cartItemToUpdate);
@@ -406,6 +434,21 @@ const deleteItem = async (req, res) => {
   }
 
   try {
+    const itemBeforeDelete = await db.CartItem.findOne({
+      where: { cart_item_id: cartItemId },
+      include: [
+        { model: Cart, as: "cart" },
+        { model: ProductVariant, as: "productVariant" },
+      ],
+    });
+
+    const trackingEventData = {
+      variantId: itemBeforeDelete.productVariant.variant_id,
+      userId: itemBeforeDelete.cart.user_id || null,
+      sessionId: itemBeforeDelete.cart.session_id || null,
+      variantPrice: itemBeforeDelete.productVariant.price,
+    };
+
     await db.CartItemService.destroy({
       where: { cart_item_id: cartItemId },
     });
@@ -417,6 +460,15 @@ const deleteItem = async (req, res) => {
     if (result === 0) {
       return res.status(404).send({ message: "CartItem not found." });
     }
+
+    handldeTrackingEvent(
+      trackingEventData.variantId,
+      trackingEventData.userId,
+      trackingEventData.sessionId,
+      trackingEventData.variantPrice,
+      1,
+      "remove_from_cart"
+    );
 
     return res.status(200).send({
       message: "successfully.",
@@ -432,10 +484,11 @@ const handldeTrackingEvent = (
   userId,
   sessionId,
   price,
-  counting_number
+  counting_number,
+  event_type
 ) => {
   const trackingData = {
-    event_type: "add_to_cart",
+    event_type: event_type,
     variant_id: parseInt(variantId),
     user_id: userId || null,
     session_id: sessionId || null,
@@ -451,8 +504,6 @@ const handldeTrackingEvent = (
         error.message
       );
     });
-
-  console.log("seccess");
 };
 
 module.exports = {

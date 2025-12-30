@@ -21,6 +21,8 @@ const {
   sequelize,
   CartItem,
   CartItemService,
+  Promotion,
+  PromotionVariant,
 } = db;
 const { Op } = db.Sequelize;
 const { deleteImageFromFirebase } = require("../utils/firebase");
@@ -414,6 +416,22 @@ const getProductVariantDetails = async (req, res) => {
                 },
               ],
             },
+            {
+              model: PromotionVariant,
+              as: "promotionVariants",
+              attributes: ["specific_discount_value"],
+              include: [
+                {
+                  model: Promotion,
+                  as: "promotion",
+                  attributes: [
+                    "promotion_name",
+                    "discount_type",
+                    "discount_value",
+                  ],
+                },
+              ],
+            },
           ],
         },
         {
@@ -649,6 +667,27 @@ const getProductVariantDetails = async (req, res) => {
         .sort(),
     }));
 
+    const variantPromotions =
+      selectedVariant.promotionVariants &&
+      selectedVariant.promotionVariants.length > 0
+        ? selectedVariant.promotionVariants.map((pv) => {
+            const promotionData = pv.promotion
+              ? pv.promotion.get({ plain: true })
+              : {};
+
+            return {
+              specificDiscountValue: pv.specific_discount_value
+                ? parseFloat(pv.specific_discount_value)
+                : null,
+              promotionName: promotionData.promotion_name,
+              discountType: promotionData.discount_type,
+              discountValue: promotionData.discount_value
+                ? parseFloat(promotionData.discount_value)
+                : 0,
+            };
+          })
+        : [];
+
     res.status(200).json({
       base: {
         productId: productDetails.product_id,
@@ -683,6 +722,10 @@ const getProductVariantDetails = async (req, res) => {
         optionValueIds: selectedVariant.selectedOptionValues
           .map((ov) => ov.option_value_id)
           .sort(),
+        promotions:
+          variantPromotions.find(
+            (promotion) => promotion.discountType === "PERCENT"
+          ) || {},
       },
       allOptions: allOptions,
       variants: allVariants,
@@ -960,6 +1003,11 @@ const getAllProductsByFilter = async (req, res) => {
           as: "category",
           attributes: ["category_id", "category_name"],
         },
+        {
+          model: ProductVariant,
+          as: "variants",
+          attributes: ["variant_id"],
+        },
       ],
       attributes: {
         include: [
@@ -1234,8 +1282,6 @@ const editVariants = async (req, res) => {
 const editService = async (req, res) => {
   const { servicePackages } = req.body;
 
-  console.log(servicePackages);
-
   if (!servicePackages || !Array.isArray(servicePackages)) {
     return res.status(400).json({ message: "Dữ liệu không hợp lệ." });
   }
@@ -1453,7 +1499,7 @@ const editProductBasicInfo = async (req, res) => {
   }
 };
 
-const getTopSaleVariants = async (req, res) => {
+const getTopSaleProducts = async (req, res) => {
   const { limit } = req.params;
 
   try {
@@ -1475,6 +1521,18 @@ const getTopSaleVariants = async (req, res) => {
           model: Product,
           as: "product",
           attributes: ["product_id", "sale_volume"],
+        },
+        {
+          model: PromotionVariant,
+          as: "promotionVariants",
+          attributes: ["specific_discount_value"],
+          include: [
+            {
+              model: Promotion,
+              as: "promotion",
+              attributes: ["promotion_name", "discount_type", "discount_value"],
+            },
+          ],
         },
       ],
       order: [[{ model: Product, as: "product" }, "sale_volume", "DESC"]],
@@ -1512,8 +1570,26 @@ const getLatestProducts = async (req, res) => {
           "image_url",
           "created_at",
         ],
+        include: [
+          {
+            model: PromotionVariant,
+            as: "promotionVariants",
+            attributes: ["specific_discount_value"],
+            include: [
+              {
+                model: Promotion,
+                as: "promotion",
+                attributes: [
+                  "promotion_name",
+                  "discount_type",
+                  "discount_value",
+                ],
+              },
+            ],
+          },
+        ],
         order: [["created_at", "DESC"]],
-        raw: true, // Lấy kết quả dưới dạng JSON thuần
+        raw: true,
       });
 
       if (latestVariant) {
@@ -1544,7 +1620,6 @@ const getLatestProducts = async (req, res) => {
 
 const getPageProductByfilter = async (req, res) => {
   const { categoryId, brandId } = req.body;
-  console.log(req.body);
   const page = parseInt(req.query.page) || 1;
   const pageSize = parseInt(req.query.pageSize) || 10;
 
@@ -1572,6 +1647,24 @@ const getPageProductByfilter = async (req, res) => {
           where: {
             item_status: "in_stock",
           },
+          include: [
+            {
+              model: PromotionVariant,
+              as: "promotionVariants",
+              attributes: ["specific_discount_value"],
+              include: [
+                {
+                  model: Promotion,
+                  as: "promotion",
+                  attributes: [
+                    "promotion_name",
+                    "discount_type",
+                    "discount_value",
+                  ],
+                },
+              ],
+            },
+          ],
         },
       ],
       offset: offset,
@@ -1776,7 +1869,12 @@ const getProductPrediction = async (req, res) => {
 
   try {
     const predictionData = await getAllVariantIds();
-    const predictedVariantIds = predictionData.map((item) => item.variant_id);
+    const predictedVariantIds = predictionData.map((item) => {
+      if (parseFloat(item.purchase_next_quarter) > 0) {
+        return item.variant_id;
+      }
+    });
+    console.log(predictionData);
     const finalResult = await getPredictedProductDetails(
       predictedVariantIds,
       predictionData,
@@ -1785,6 +1883,7 @@ const getProductPrediction = async (req, res) => {
 
     res.status(200).send(finalResult);
   } catch (error) {
+    console.error(error);
     res.status(500).send(error.message);
   }
 };
@@ -1804,7 +1903,7 @@ async function getAllVariantIds() {
       throw new Error(`Lỗi HTTP! Status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = response.json();
 
     return data;
   } catch (error) {
@@ -1889,7 +1988,6 @@ const getAllProductVariants = async (req, res) => {
 
 const editProductStatus = async (req, res) => {
   const { variantId, status } = req.body;
-  console.log(variantId, status);
   const newStatus = status === true ? "in_stock" : "out_of_stock";
   try {
     const [updatedRows] = await ProductVariant.update(
@@ -1915,6 +2013,35 @@ const editProductStatus = async (req, res) => {
   }
 };
 
+const getVariantsDiscount = async (req, res) => {
+  try {
+    const variants = await ProductVariant.findAll({
+      include: [
+        { model: Product, as: "product" },
+        {
+          model: PromotionVariant,
+          as: "promotionVariants",
+          required: true,
+          include: [
+            {
+              model: Promotion,
+              as: "promotion",
+            },
+          ],
+        },
+      ],
+    });
+    return res.status(200).json({
+      variants: variants,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Không thể tải sản phẩm giảm giá.",
+    });
+  }
+};
+
 module.exports = {
   createProductWithDetails,
   getProductVariantDetails,
@@ -1924,7 +2051,7 @@ module.exports = {
   editVariants,
   editService,
   editSpecifications,
-  getTopSaleVariants,
+  getTopSaleProducts,
   getLatestProducts,
   getPageProductByfilter,
   editProductBasicInfo,
@@ -1933,4 +2060,5 @@ module.exports = {
   getProductPrediction,
   getAllProductVariants,
   editProductStatus,
+  getVariantsDiscount,
 };

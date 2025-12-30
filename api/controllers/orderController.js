@@ -18,6 +18,7 @@ const {
 } = require("../services/payment/traditionalPaymentService");
 const { createVnpayOrder } = require("../services/payment/vnpayPaymentService");
 const { getRevenueByYearAndQuarter } = require("../services/orderService");
+const { pushEventToQueue } = require("../services/eventQueueService");
 
 const paymentStrategies = {
   traditional: createTraditionalOrder,
@@ -61,21 +62,84 @@ const createOrder = async (req, res) => {
       guestInfo,
     });
 
+    console.log("result: ", result);
+
+    pushEventToQueue("NEW_ORDER_ALERT", {
+      order_id: result.order_id,
+      user_id: userId || null,
+      session_id: sessionId || null,
+    }).catch((error) => {
+      console.error(
+        `[ORDER Alert Error] Can't push ${result.order_id} into Queue:`,
+        error.message
+      );
+    });
+
+    const completeOrder = await db.Order.findOne({
+      where: { order_id: result.order_id },
+      include: [
+        {
+          model: db.OrderItem,
+          as: "orderItems",
+          include: [
+            {
+              model: db.ProductVariant,
+              as: "productVariant",
+            },
+          ],
+        },
+      ],
+    });
+
+    completeOrder.orderItems.forEach((item) => {
+      handldeTrackingEvent(
+        item.variant_id,
+        completeOrder.user_id,
+        completeOrder.session_id,
+        item.price,
+        item.quantity,
+        "purchase"
+      );
+    });
+
     if (method === "traditional") {
       return res.status(201).json(result.order_id);
     } else if (method === "vnpay") {
       return res.status(201).json({
         message: "Tạo Đơn Hàng thành công!!",
-        orderId: result.newOrder.order_id,
+        orderId: result.order_id,
         redirect: result.vnpayUrl,
       });
     }
   } catch (error) {
     const errorMessage = error.message;
+    console.error(error);
     return res.status(400).json({
       message: errorMessage || "Không thể tạo đơn hàng!!",
     });
   }
+};
+
+const handldeTrackingEvent = (
+  variantId,
+  userId,
+  sessionId,
+  price,
+  counting_number,
+  event_type
+) => {
+  const trackingData = {
+    event_type: event_type,
+    variant_id: parseInt(variantId),
+    user_id: userId || null,
+    session_id: sessionId || null,
+    price_at_event: parseInt(price),
+    click_counting: counting_number,
+  };
+
+  pushEventToQueue("PRODUCT_TRACKING", trackingData).catch((error) => {
+    console.error("[Tracking Error] Không thể push vào Queue:", error.message);
+  });
 };
 
 const getOrderQuarterlyRevenue = async (req, res) => {
@@ -408,15 +472,6 @@ const editOrderStatus = async (req, res) => {
       if (currentStatus === "pending" && status === "preparing") {
         for (const item of order.orderItems) {
           const variant = item.productVariant;
-          const newStock = variant.stock_quantity - item.quantity;
-
-          if (newStock < 0) {
-            return res.status(400).json({
-              message: `Không đủ số lượng sản phẩm '${variant.variant_name}' trong kho.`,
-            });
-          }
-
-          await variant.update({ stock_quantity: newStock });
         }
       }
 
@@ -442,6 +497,15 @@ const editOrderStatus = async (req, res) => {
         payment_status: payment_status,
       });
 
+      pushEventToQueue("NEW_ORDER_ALERT", {
+        order_id: order.order_id,
+      }).catch((error) => {
+        console.error(
+          `[ORDER Alert Error] Can't push ${result.order_id} into Queue:`,
+          error.message
+        );
+      });
+
       return res
         .status(200)
         .json({ message: "Trạng thái đơn hàng đã được cập nhật thành công." });
@@ -461,50 +525,119 @@ const checkVNPay = async (req, res) => {
 
   try {
     const vnpay = new VNPay({
-      tmnCode: "0TSSC1QT",
-      secureSecret: "OTYGF8UKW9QVWWTE0BTY82Z1P3LOUA47",
+      tmnCode: "HZ671ZDB",
+      secureSecret: "6THKU1LUUKK7OL76SVIJBO86KD0AU1J4",
     });
 
+    // Xác thực phản hồi từ VNPay
     const isValidSignature = vnpay.verifyReturnUrl(queryParams);
 
-    if (!isValidSignature.isVerified || !isValidSignature.isSuccess) {
-      return res.redirect("http://localhost:3001/home");
+    if (!isValidSignature.isVerified) {
+      console.error("❌ VNPay Signature Verification Failed!");
+      return res.redirect("http://localhost:3001/home?status=error");
     }
 
     const { vnp_TxnRef, vnp_ResponseCode } = queryParams;
     const orderId = vnp_TxnRef;
-    if (vnp_ResponseCode === "00") {
-      console.log("✅ Payment success:", vnp_TxnRef);
 
-      await Order.update(
+    if (vnp_ResponseCode === "00") {
+      // --- THANH TOÁN THÀNH CÔNG ---
+      await db.Order.update(
         { payment_status: "paid" },
         { where: { order_id: orderId } }
       );
-
-      if (userId) {
-        await Cart.destroy({ where: { user_id: userId } });
-      }
-
-      if (sessionId) {
-        await Cart.destroy({ where: { session_id: sessionId } });
-      }
-
-      return res.redirect("http://localhost:3001/home");
+      return res.redirect("http://localhost:3001/home?status=paid");
     } else {
-      console.warn("❌ Payment failed:", vnp_TxnRef);
+      // --- THANH TOÁN THẤT BẠI ---
+      console.warn(
+        `❌ Payment failed for Order: ${orderId}. Response Code: ${vnp_ResponseCode}`
+      );
 
-      await Order.destroy({ where: { order_id: orderId } });
+      ///detele if vnpay fale////
+      try {
+        const orderToDelete = await db.Order.findByPk(orderId, {
+          include: [{ model: db.OrderItem, as: "orderItems" }],
+        });
 
-      return res.redirect("http://localhost:3001/home");
+        if (orderToDelete) {
+          await db.sequelize.transaction(async (t) => {
+            // 1. Cộng trả lại kho (Stock Revert)
+            for (const item of orderToDelete.orderItems) {
+              await db.ProductVariant.increment("stock_quantity", {
+                by: item.quantity,
+                where: { variant_id: item.variant_id },
+                transaction: t,
+              });
+            }
+            // 2. Xóa đơn hàng hoàn toàn
+            await orderToDelete.destroy({ transaction: t });
+          });
+          console.log(
+            `[CLEANUP] Successfully deleted failed order ${orderId} and reverted stock.`
+          );
+        }
+      } catch (cleanupError) {
+        console.error("[CLEANUP ERROR]:", cleanupError.message);
+      }
+      ///end detele if vnpay fale////
+
+      return res.redirect("http://localhost:3001/home?status=failed");
     }
   } catch (error) {
-    console.error("Error in checkVNPay controller:", error);
+    console.error("Critical Error in checkVNPay:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
 
-    res.status(500).send({
-      message:
-        error.message ||
-        "An unexpected error occurred while fetching revenue data.",
+const loockupPreciusStatus = {
+  cancel: "pending",
+  preparing: "pending",
+  shipping: "preparing",
+  completed: "shipping",
+};
+
+const editRevertOrderStatus = async (req, res) => {
+  const { order_id } = req.params;
+
+  try {
+    const order = await db.Order.findByPk(order_id);
+
+    if (!order) {
+      return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
+    }
+
+    const currentStatus = order.order_status;
+    const previousStatus = loockupPreciusStatus[currentStatus];
+
+    if (!previousStatus || currentStatus === "pending") {
+      return res.status(400).json({
+        message: `Không thể quay lại trạng thái trước đó từ trạng thái: ${currentStatus}`,
+      });
+    }
+
+    order.order_status = previousStatus;
+    await order.save();
+
+    pushEventToQueue("NEW_ORDER_ALERT", {
+      order_id: order.order_id,
+    }).catch((error) => {
+      console.error(
+        `[ORDER Alert Error] Can't push ${result.order_id} into Queue:`,
+        error.message
+      );
     });
+
+    return res.status(200).json({
+      message: "Hoàn tác trạng thái đơn hàng thành công",
+      data: {
+        order_id: order.order_id,
+        old_status: currentStatus,
+        new_status: order.order_status,
+      },
+    });
+  } catch (error) {
+    console.error("Lỗi khi hoàn tác trạng thái:", error);
+    return res.status(500).json({ message: "Lỗi máy chủ nội bộ" });
   }
 };
 
@@ -516,4 +649,5 @@ module.exports = {
   editOrderStatus,
   checkVNPay,
   chatbotAskingOrder,
+  editRevertOrderStatus,
 };

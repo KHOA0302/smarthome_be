@@ -83,7 +83,7 @@ async function getPredictedProductDetails(variantIds, predictionData, filter) {
       ...variantData,
 
       predicted_order_next_quarter: prediction
-        ? prediction.predicted_order_next_quarter
+        ? prediction.purchase_next_quarter
         : 0,
     };
   });

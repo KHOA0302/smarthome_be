@@ -7,8 +7,6 @@ const {
 const QUEUE_NAME = "MAIN_WORKER_QUEUE";
 
 async function startWorker() {
-  console.log("Worker đang khởi động và lắng nghe Queue......");
-
   while (true) {
     const item = await redisClient.brpop(QUEUE_NAME, 0);
 
@@ -25,6 +23,12 @@ async function startWorker() {
             await processAlertEvent(job);
             break;
           case "DELETE_INVENTORY_ALERT":
+            await processDeleteAlertEvent(job);
+            break;
+          case "NEW_ORDER_ALERT":
+            await processAlertEvent(job);
+            break;
+          case "DELETE_ORDER_ALERT":
             await processDeleteAlertEvent(job);
             break;
           default:

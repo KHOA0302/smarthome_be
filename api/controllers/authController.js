@@ -17,7 +17,6 @@ const handleLoginAttemp = async (req, res) => {
 
   try {
     const { sessionId } = req;
-    console.log({ username, password, sessionId });
 
     const user = await User.findOne({
       where: { email: username },
@@ -208,7 +207,6 @@ const handleRegister = async (req, res) => {
 
     const existingUser = await User.findOne({ where: { email: email } });
     if (existingUser) {
-      console.log(existingUser.email, "has been existed!!");
       return res.status(409).json({
         message:
           "Email này đã được sử dụng. Vui lòng sử dụng email khác hoặc đăng nhập.",
@@ -272,7 +270,7 @@ const handleGoogle = async (req, res) => {
     let user = await User.findOne({ where: { google_sub_id: googleUserId } });
 
     if (user) {
-      console.log(`User ${email} đăng nhập bằng Google.`);
+      console.log(`User ${email} login by Google.`);
 
       user.full_name = fullName;
       await user.save();
@@ -282,10 +280,6 @@ const handleGoogle = async (req, res) => {
       });
 
       if (existingTraditionalUser) {
-        console.log(
-          `Email ${email} đã có tài khoản truyền thống. Liên kết với Google.`
-        );
-
         existingTraditionalUser.google_sub_id = googleUserId;
         existingTraditionalUser.is_email_verified = isEmailVerifiedByGoogle;
         existingTraditionalUser.full_name =
@@ -307,7 +301,6 @@ const handleGoogle = async (req, res) => {
         });
         return;
       } else {
-        console.log(`Tạo tài khoản mới cho ${email} qua Google.`);
         user = await User.create({
           email: email,
           full_name: fullName,
@@ -333,7 +326,6 @@ const handleGoogle = async (req, res) => {
         return;
       }
     }
-    console.log(user);
 
     res.status(200).json({
       message: "Đăng nhập thành công!",

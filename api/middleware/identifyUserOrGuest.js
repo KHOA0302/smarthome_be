@@ -16,7 +16,7 @@ const identifyUserOrGuest = asyncHandler(async (req, res, next) => {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      req.user = { id: decoded.user_id };
+      req.user = { id: decoded.user_id, role_id: decoded.role_id };
       req.isGuest = false;
       return next();
     } catch (err) {

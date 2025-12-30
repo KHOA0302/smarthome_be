@@ -54,8 +54,6 @@ const getBrandById = async (req, res) => {
 const createBrand = async (req, res) => {
   const { brand_name, logo_url } = req.body;
 
-  console.log({ brand_name, logo_url });
-
   try {
     ////////////////////////////////////////////
     const existingBrand = await Brand.findOne({
@@ -204,7 +202,6 @@ const editBrand = async (req, res) => {
     });
 
     if (rowsAffected === 0) {
-      console.log(newBrand, brand_id, rowsAffected);
       return res.status(404).json({
         message: `Không tìm thấy thương hiệu hoặc không có sự thay đổi được thực thi.`,
       });

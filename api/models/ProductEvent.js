@@ -23,7 +23,12 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.STRING(255),
       },
       event_type: {
-        type: Sequelize.ENUM("view", "add_to_cart"),
+        type: Sequelize.ENUM(
+          "view",
+          "add_to_cart",
+          "purchase",
+          "remove_from_cart "
+        ),
         allowNull: false,
       },
       variant_id: {

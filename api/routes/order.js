@@ -40,4 +40,12 @@ router.put(
 );
 
 router.get("/check-vnpay", identifyUserOrGuest, orderController.checkVNPay);
+
+router.patch(
+  "/edit-revert-order-status/:order_id",
+  protect,
+  authorize("admin"),
+  orderController.editRevertOrderStatus
+);
+
 module.exports = router;

@@ -1,12 +1,21 @@
 const db = require("../../models/index");
-const { Notification, ProductVariant, Product, Order, OrderItem, Promotion } =
-  db;
+const {
+  Notification,
+  ProductVariant,
+  Product,
+  Order,
+  OrderItem,
+  Promotion,
+  User,
+} = db;
 
 const getProductVariant = async (notificationId = null) => {
   try {
     return await Notification.findAll({
       order: [["created_at", "DESC"]],
-      where: notificationId ? { id: notificationId } : {},
+      where: notificationId
+        ? { id: notificationId, type: "NEW_INVENTORY_ALERT" }
+        : { type: "NEW_INVENTORY_ALERT" },
       include: [
         {
           model: ProductVariant,

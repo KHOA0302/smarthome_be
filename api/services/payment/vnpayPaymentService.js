@@ -1,8 +1,11 @@
 const { VNPay, dateFormat } = require("vnpay");
 const db = require("../../models");
+const eventQueueService = require("../eventQueueService");
 
 const createVnpayOrder = async (orderData) => {
+  const variantsToAlert = [];
   const result = await db.sequelize.transaction(async (t) => {
+    // 1. Lấy thông tin giỏ hàng
     const cart = await db.Cart.findByPk(orderData.cartId, {
       include: [
         {
@@ -13,15 +16,20 @@ const createVnpayOrder = async (orderData) => {
               model: db.CartItemService,
               as: "cartItemServices",
               include: [
-                {
-                  model: db.PackageServiceItem,
-                  as: "packageServiceItem",
-                },
+                { model: db.PackageServiceItem, as: "packageServiceItem" },
               ],
             },
             {
               model: db.ProductVariant,
               as: "productVariant",
+              include: [
+                {
+                  model: db.Promotion,
+                  as: "promotions",
+                  where: { is_active: true },
+                  required: false,
+                },
+              ],
             },
           ],
         },
@@ -29,10 +37,9 @@ const createVnpayOrder = async (orderData) => {
       transaction: t,
     });
 
-    if (!cart) {
-      throw new Error("Cart not found.");
-    }
+    if (!cart) throw new Error("Cart not found.");
 
+    // 2. Gom nhóm và kiểm tra tồn kho
     const aggregatedQuantities = {};
     for (const cartItem of cart.cartItems) {
       const { variant_id, quantity } = cartItem;
@@ -40,53 +47,64 @@ const createVnpayOrder = async (orderData) => {
         (aggregatedQuantities[variant_id] || 0) + quantity;
     }
 
-    const variantIds = Object.keys(aggregatedQuantities);
     const variants = await db.ProductVariant.findAll({
-      where: { variant_id: variantIds },
+      where: { variant_id: Object.keys(aggregatedQuantities) },
       lock: true,
       transaction: t,
     });
 
-    const outOfStockItems = variants.filter(
-      (variant) =>
-        variant.stock_quantity < aggregatedQuantities[variant.variant_id]
-    );
-
-    if (outOfStockItems.length > 0) {
-      const errorMsg = outOfStockItems
-        .map((item) => `Sản phẩm ${item.variant_name} không đủ hàng.`)
-        .join(" ");
-      throw new Error(errorMsg);
+    for (const variant of variants) {
+      if (variant.item_status !== "in_stock")
+        throw new Error(`Sản phẩm ${variant.variant_name} tạm ngưng bán.`);
+      if (variant.stock_quantity < aggregatedQuantities[variant.variant_id])
+        throw new Error(`Sản phẩm ${variant.variant_name} không đủ hàng.`);
     }
 
+    // 3. Cập nhật tồn kho (Trừ kho ngay lập tức)
     for (const variant of variants) {
       variant.stock_quantity -= aggregatedQuantities[variant.variant_id];
       await variant.save({ transaction: t });
+      if (variant.stock_quantity === 0)
+        variantsToAlert.push({ variant_id: variant.variant_id });
     }
 
+    // 4. Tính toán tổng tiền
     let orderTotal = 0;
-
     const newOrderItemsPayload = [];
-    const newOrderItemServicesPayload = [];
-
     for (const cartItem of cart.cartItems) {
-      const cartItemTotalPrice = parseFloat(cartItem.price) * cartItem.quantity;
+      const variant = cartItem.productVariant;
+      const basePrice = parseFloat(variant.price);
+      let servicePriceTotal = 0;
+      for (const cartService of cartItem.cartItemServices) {
+        servicePriceTotal += parseFloat(
+          cartService.packageServiceItem.item_price_impact || 0
+        );
+      }
+      let discountValue =
+        variant.promotions && variant.promotions.length > 0
+          ? parseFloat(variant.promotions[0].discount_value || 0)
+          : 0;
 
-      orderTotal += cartItemTotalPrice;
+      const discountedVariantPrice = (basePrice * (100 - discountValue)) / 100;
+      const fullPricePerItem = discountedVariantPrice + servicePriceTotal;
+      const itemTotalPrice = fullPricePerItem * cartItem.quantity;
+      orderTotal += itemTotalPrice;
 
-      const orderItemPayload = {
+      newOrderItemsPayload.push({
         variant_id: cartItem.variant_id,
         quantity: cartItem.quantity,
-        price: parseFloat(cartItem.price),
-        total_price: cartItemTotalPrice,
-      };
-      newOrderItemsPayload.push(orderItemPayload);
+        price: fullPricePerItem,
+        total_price: itemTotalPrice,
+        originalCartItem: cartItem,
+      });
     }
 
+    // 5. Tạo Order (Trạng thái pending)
     const newOrder = await db.Order.create(
       {
         user_id: cart.user_id,
         ...orderData.guestInfo,
+        session_id: orderData.sessionId,
         order_total: orderTotal,
         payment_method: "vnpay",
         payment_status: "unpaid",
@@ -95,62 +113,68 @@ const createVnpayOrder = async (orderData) => {
       { transaction: t }
     );
 
-    const orderItemsWithOrderId = newOrderItemsPayload.map((item) => ({
-      ...item,
-      order_id: newOrder.order_id,
-    }));
-
+    // 6. Tạo OrderItems và Services
     const createdOrderItems = await db.OrderItem.bulkCreate(
-      orderItemsWithOrderId,
-      {
-        transaction: t,
-      }
+      newOrderItemsPayload.map((item) => ({
+        variant_id: item.variant_id,
+        quantity: item.quantity,
+        price: item.price,
+        total_price: item.total_price,
+        order_id: newOrder.order_id,
+      })),
+      { transaction: t }
     );
 
-    for (let i = 0; i < cart.cartItems.length; i++) {
-      const cartItem = cart.cartItems[i];
-      const createdOrderItem = createdOrderItems[i];
-
-      for (const cartItemService of cartItem.cartItemServices) {
+    const newOrderItemServicesPayload = [];
+    for (let i = 0; i < newOrderItemsPayload.length; i++) {
+      const originalCartItem = newOrderItemsPayload[i].originalCartItem;
+      for (const cartItemService of originalCartItem.cartItemServices) {
         newOrderItemServicesPayload.push({
-          order_item_id: createdOrderItem.order_item_id,
+          order_item_id: createdOrderItems[i].order_item_id,
           package_service_item_id: cartItemService.package_service_item_id,
-          price: parseFloat(cartItemService.price),
+          price: parseFloat(
+            cartItemService.packageServiceItem.item_price_impact || 0
+          ),
         });
       }
     }
-
     await db.OrderItemService.bulkCreate(newOrderItemServicesPayload, {
       transaction: t,
     });
 
+    // 7. XÓA GIỎ HÀNG NGAY LẬP TỨC
+    await cart.destroy({ transaction: t });
+
+    // 8. Tạo VNPay URL (Redirect về Backend cổng 8000)
     const vnpay = new VNPay({
-      tmnCode: "0TSSC1QT",
-      secureSecret: "OTYGF8UKW9QVWWTE0BTY82Z1P3LOUA47",
+      tmnCode: "HZ671ZDB",
+      secureSecret: "6THKU1LUUKK7OL76SVIJBO86KD0AU1J4",
     });
 
-    const currentDate = new Date();
-    const vnp_CreateDate = dateFormat(currentDate);
-    const vnp_ExpireDate = dateFormat(
-      new Date(currentDate.getTime() + 30 * 60 * 1000)
-    );
-
     const vnp_ReturnUrl = orderData.userId
-      ? `http://localhost:8080/order/check-vnpay?userId=${orderData.userId}`
-      : `http://localhost:8080/order/check-vnpay?sessionId=${orderData.sessionId}`;
-
+      ? `http://localhost:8000/order/check-vnpay?userId=${orderData.userId}`
+      : `http://localhost:8000/order/check-vnpay?sessionId=${orderData.sessionId}`;
+      
     const vnpayUrl = vnpay.buildPaymentUrl({
       vnp_Amount: newOrder.order_total,
       vnp_TxnRef: `${newOrder.order_id}`,
       vnp_IpAddr: "127.0.0.1",
-      vnp_OrderInfo: `${newOrder.order_id}`,
+      vnp_OrderInfo: `Thanh toán đơn hàng ${newOrder.order_id}`,
       vnp_ReturnUrl,
-      vnp_CreateDate,
-      vnp_ExpireDate,
+      vnp_CreateDate: dateFormat(new Date()),
+      vnp_ExpireDate: dateFormat(new Date(Date.now() + 30 * 60 * 1000)),
     });
 
-    return { newOrder, vnpayUrl };
+    return { ...newOrder.get({ plain: true }), vnpayUrl };
   });
+
+  if (variantsToAlert.length > 0) {
+    variantsToAlert.forEach((data) =>
+      eventQueueService
+        .pushEventToQueue("NEW_INVENTORY_ALERT", data)
+        .catch(console.error)
+    );
+  }
 
   return result;
 };

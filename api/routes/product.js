@@ -68,7 +68,7 @@ router.put(
 
 router.get("/search", productController.searchTopProducts);
 
-router.get("/get-top-sale/:limit", productController.getTopSaleVariants);
+router.get("/get-top-sale/:limit", productController.getTopSaleProducts);
 router.get("/get-latest-product/:limit", productController.getLatestProducts);
 router.post("/get-product-by-filter", productController.getPageProductByfilter);
 
@@ -94,5 +94,7 @@ router.patch(
   authorize("admin"),
   productController.editProductStatus
 );
+
+router.get("/promotion-product", productController.getVariantsDiscount);
 
 module.exports = router;

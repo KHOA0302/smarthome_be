@@ -4,7 +4,6 @@ const { ProductVariant, Promotion, PromotionVariant, Sequelize, sequelize } =
 
 const createPromotion = async (req, res) => {
   const { promotion, promotionVariants } = req.body;
-  console.log(promotion, promotionVariants);
   const newPromotionData = {
     promotion_name: promotion.name,
     discount_value: parseFloat(promotion.discount),

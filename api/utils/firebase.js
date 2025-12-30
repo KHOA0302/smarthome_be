@@ -13,7 +13,6 @@ const deleteImageFromFirebase = async (imageURL) => {
 
     await deleteObject(imageRef);
 
-    console.log("Ảnh đã được xóa thành công!");
     return true;
   } catch (error) {
     console.error("Lỗi khi xóa ảnh từ Firebase:", error);

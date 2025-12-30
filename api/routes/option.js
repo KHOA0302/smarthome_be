@@ -16,4 +16,11 @@ router.post(
   optionController.createOption
 );
 
+router.post(
+  "/update",
+  protect,
+  authorize("admin"),
+  optionController.updateOption
+);
+
 module.exports = router;

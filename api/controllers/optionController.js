@@ -87,8 +87,6 @@ const getOptionById = async (req, res) => {
 const createOption = async (req, res) => {
   const { categoryId, optionName, isFilterable } = req.body;
 
-  console.log(categoryId, optionName, isFilterable);
-
   try {
     const categoryExists = await db.Category.findByPk(categoryId);
     if (!categoryExists) {
@@ -117,63 +115,37 @@ const createOption = async (req, res) => {
 };
 
 const updateOption = async (req, res) => {
-  const { id } = req.params;
-  const { option_name, is_filterable, category_id } = req.body;
+  const { option_name, option_id } = req.body;
 
   try {
-    const option = await Option.findByPk(id);
+    const option = await Option.findByPk(option_id);
 
     if (!option) {
-      return res
-        .status(404)
-        .json({ message: `Không tìm thấy tùy chọn với ID: ${id}.` });
-    }
-
-    if (
-      option_name &&
-      (option_name !== option.option_name ||
-        (category_id && category_id !== option.category_id))
-    ) {
-      const existingOption = await Option.findOne({
-        where: {
-          option_name: option_name,
-          category_id: category_id || option.category_id,
-          option_id: { [Sequelize.Op.ne]: id },
-        },
-      });
-      if (existingOption) {
-        return res.status(409).json({
-          message: "Tên tùy chọn này đã tồn tại trong danh mục đã chọn.",
-        });
+      return res.status(404).json({ message: "Không tìm thấy dịch vụ!" });
+    } else {
+      if (option.option_name === option_name) {
+        return res.status(404).json({ message: "Tên không thay đổi!" });
       }
     }
 
-    if (category_id && category_id !== option.category_id) {
-      const categoryExists = await db.Category.findByPk(category_id);
-      if (!categoryExists) {
-        return res
-          .status(400)
-          .json({ message: `Category với ID: ${category_id} không tồn tại.` });
+    await Option.update(
+      {
+        option_name: option_name,
+        updated_at: new Date(),
+      },
+      {
+        where: { option_id: option_id },
       }
-    }
+    );
 
-    option.option_name = option_name || option.option_name;
-    option.is_filterable =
-      is_filterable !== undefined ? is_filterable : option.is_filterable;
-    option.category_id = category_id || option.category_id;
-
-    await option.save();
-
-    res.status(200).json({
-      message: `Cập nhật tùy chọn với ID ${id} thành công.`,
-      data: option,
+    return res.status(200).json({
+      message: "Cập nhật tên lựa chọn thành công!",
+      data: { option_id, option_name },
     });
   } catch (error) {
-    console.error(`Lỗi khi cập nhật tùy chọn với ID ${id}:`, error);
-    res.status(500).json({
-      message: "Lỗi máy chủ nội bộ khi cập nhật tùy chọn.",
-      error: error.message,
-    });
+    console.error("Lỗi cập nhật:", error);
+
+    return res.status(500).json({ message: "Lỗi hệ thống khi cập nhật." });
   }
 };
 

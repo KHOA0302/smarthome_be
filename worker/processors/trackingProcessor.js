@@ -2,6 +2,8 @@ require("dotenv").config();
 const db = require("../../api/models");
 const { ProductEvent } = db;
 
+//purchase với remove_from_cart
+
 async function processTrackingEvent(eventDataString) {
   try {
     const {
@@ -38,8 +40,11 @@ async function processTrackingEvent(eventDataString) {
         newClickCount = eventRecord.click_counting + 1;
       } else if (event_type === "add_to_cart") {
         newClickCount = click_counting;
+      } else if (event_type === "remove_from_cart") {
+        newClickCount = eventRecord.click_counting + 1;
+      } else if (event_type === "purchase") {
+        newClickCount = eventRecord.click_counting + 1;
       }
-
       await ProductEvent.update(
         {
           click_counting: newClickCount,

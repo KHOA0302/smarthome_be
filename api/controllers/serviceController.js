@@ -105,7 +105,39 @@ const createService = async (req, res) => {
   }
 };
 
-const updateService = async (req, res) => {};
+const updateService = async (req, res) => {
+  const { service_id, service_name } = req.body;
+  try {
+    const service = await Service.findByPk(service_id);
+
+    if (!service) {
+      return res.status(404).json({ message: "Không tìm thấy dịch vụ!" });
+    } else {
+      if (service.service_name === service_name) {
+        return res.status(404).json({ message: "Tên không thay đổi!" });
+      }
+    }
+
+    await Service.update(
+      {
+        service_name: service_name,
+        updated_at: new Date(),
+      },
+      {
+        where: { service_id: service_id },
+      }
+    );
+
+    return res.status(200).json({
+      message: "Cập nhật tên dịch vụ thành công!",
+      data: { service_id, service_name },
+    });
+  } catch (error) {
+    console.error("Lỗi cập nhật:", error);
+
+    return res.status(500).json({ message: "Lỗi hệ thống khi cập nhật." });
+  }
+};
 
 const deleteService = async (req, res) => {
   const { id } = req.params;
