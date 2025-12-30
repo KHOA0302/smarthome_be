@@ -1,4 +1,3 @@
-// models/servicePackage.model.js
 module.exports = (sequelize, Sequelize) => {
   const ServicePackage = sequelize.define(
     "servicepackages",

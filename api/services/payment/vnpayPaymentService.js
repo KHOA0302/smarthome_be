@@ -5,7 +5,6 @@ const eventQueueService = require("../eventQueueService");
 const createVnpayOrder = async (orderData) => {
   const variantsToAlert = [];
   const result = await db.sequelize.transaction(async (t) => {
-    // 1. Lấy thông tin giỏ hàng
     const cart = await db.Cart.findByPk(orderData.cartId, {
       include: [
         {
@@ -39,7 +38,6 @@ const createVnpayOrder = async (orderData) => {
 
     if (!cart) throw new Error("Cart not found.");
 
-    // 2. Gom nhóm và kiểm tra tồn kho
     const aggregatedQuantities = {};
     for (const cartItem of cart.cartItems) {
       const { variant_id, quantity } = cartItem;
@@ -60,7 +58,6 @@ const createVnpayOrder = async (orderData) => {
         throw new Error(`Sản phẩm ${variant.variant_name} không đủ hàng.`);
     }
 
-    // 3. Cập nhật tồn kho (Trừ kho ngay lập tức)
     for (const variant of variants) {
       variant.stock_quantity -= aggregatedQuantities[variant.variant_id];
       await variant.save({ transaction: t });
@@ -68,7 +65,6 @@ const createVnpayOrder = async (orderData) => {
         variantsToAlert.push({ variant_id: variant.variant_id });
     }
 
-    // 4. Tính toán tổng tiền
     let orderTotal = 0;
     const newOrderItemsPayload = [];
     for (const cartItem of cart.cartItems) {
@@ -99,7 +95,6 @@ const createVnpayOrder = async (orderData) => {
       });
     }
 
-    // 5. Tạo Order (Trạng thái pending)
     const newOrder = await db.Order.create(
       {
         user_id: cart.user_id,
@@ -113,7 +108,6 @@ const createVnpayOrder = async (orderData) => {
       { transaction: t }
     );
 
-    // 6. Tạo OrderItems và Services
     const createdOrderItems = await db.OrderItem.bulkCreate(
       newOrderItemsPayload.map((item) => ({
         variant_id: item.variant_id,
@@ -142,10 +136,8 @@ const createVnpayOrder = async (orderData) => {
       transaction: t,
     });
 
-    // 7. XÓA GIỎ HÀNG NGAY LẬP TỨC
     await cart.destroy({ transaction: t });
 
-    // 8. Tạo VNPay URL (Redirect về Backend cổng 8000)
     const vnpay = new VNPay({
       tmnCode: "HZ671ZDB",
       secureSecret: "6THKU1LUUKK7OL76SVIJBO86KD0AU1J4",
@@ -154,7 +146,7 @@ const createVnpayOrder = async (orderData) => {
     const vnp_ReturnUrl = orderData.userId
       ? `http://localhost:8000/order/check-vnpay?userId=${orderData.userId}`
       : `http://localhost:8000/order/check-vnpay?sessionId=${orderData.sessionId}`;
-      
+
     const vnpayUrl = vnpay.buildPaymentUrl({
       vnp_Amount: newOrder.order_total,
       vnp_TxnRef: `${newOrder.order_id}`,

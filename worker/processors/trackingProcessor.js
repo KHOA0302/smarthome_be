@@ -2,8 +2,6 @@ require("dotenv").config();
 const db = require("../../api/models");
 const { ProductEvent } = db;
 
-//purchase với remove_from_cart
-
 async function processTrackingEvent(eventDataString) {
   try {
     const {

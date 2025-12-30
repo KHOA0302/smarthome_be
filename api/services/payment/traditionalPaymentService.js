@@ -35,19 +35,17 @@ const createTraditionalOrder = async (orderData) => {
             {
               model: ProductVariant,
               as: "productVariant",
-              ////Code mới////
+
               include: [
                 {
                   model: Promotion,
                   as: "promotions",
                   where: {
                     is_active: true,
-                    // Bạn có thể thêm điều kiện ngày tháng ở đây nếu cần
                   },
                   required: false,
                 },
               ],
-              ////end code mới//////
             },
           ],
         },
@@ -73,13 +71,11 @@ const createTraditionalOrder = async (orderData) => {
       transaction: t,
     });
 
-    // --- BẮT ĐẦU PHẦN THÊM MỚI ---
     for (const variant of variants) {
       if (variant.item_status !== "in_stock") {
         throw new Error(`Sản phẩm ${variant.variant_name} hiện tạm ngưng bán.`);
       }
     }
-    // --- KẾT THÚC PHẦN THÊM MỚI ---
 
     const outOfStockItems = variants.filter(
       (variant) =>
@@ -110,22 +106,9 @@ const createTraditionalOrder = async (orderData) => {
     const newOrderItemServicesPayload = [];
 
     for (const cartItem of cart.cartItems) {
-      // const cartItemTotalPrice = parseFloat(cartItem.price) * cartItem.quantity;
-
-      // orderTotal += cartItemTotalPrice;
-
-      // const orderItemPayload = {
-      //   variant_id: cartItem.variant_id,
-      //   quantity: cartItem.quantity,
-      //   price: parseFloat(cartItem.price),
-      //   total_price: cartItemTotalPrice,
-      // };
-
-      ////Code mới////
       const variant = cartItem.productVariant;
       const basePrice = parseFloat(variant.price);
 
-      // 1. Tính tổng giá dịch vụ (servicePrice)
       let servicePriceTotal = 0;
       for (const cartService of cartItem.cartItemServices) {
         console.log(cartService);
@@ -135,14 +118,11 @@ const createTraditionalOrder = async (orderData) => {
         servicePriceTotal += impact;
       }
 
-      // 2. Kiểm tra Discount từ Promotion
       let discountValue = 0;
       if (variant.promotions && variant.promotions.length > 0) {
-        // Lấy khuyến mãi đầu tiên đang active
         discountValue = parseFloat(variant.promotions[0].discount_value || 0);
       }
 
-      // 3. Tính fullPrice theo logic: price*(100-discount)/100 + servicePrice
       const discountedVariantPrice = (basePrice * (100 - discountValue)) / 100;
       const fullPricePerItem = discountedVariantPrice + servicePriceTotal;
       const itemTotalPrice = fullPricePerItem * cartItem.quantity;
@@ -152,10 +132,9 @@ const createTraditionalOrder = async (orderData) => {
       const orderItemPayload = {
         variant_id: cartItem.variant_id,
         quantity: cartItem.quantity,
-        price: fullPricePerItem, // Lưu giá đã cộng dịch vụ và trừ giảm giá
+        price: fullPricePerItem,
         total_price: itemTotalPrice,
       };
-      ////end code mới//////
 
       newOrderItemsPayload.push(orderItemPayload);
     }
@@ -193,11 +172,10 @@ const createTraditionalOrder = async (orderData) => {
         newOrderItemServicesPayload.push({
           order_item_id: createdOrderItem.order_item_id,
           package_service_item_id: cartItemService.package_service_item_id,
-          ////Code mới////
+
           price: parseFloat(
             cartItemService.packageServiceItem.item_price_impact || 0
           ),
-          ////end code mới//////
         });
       }
     }
